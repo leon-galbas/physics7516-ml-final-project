@@ -8,10 +8,12 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "ipympl>=0.10.0",
     "jupyter>=1.1.1",
     "matplotlib>=3.11.0",
     "numpy>=2.5.1",
     "pandas>=3.0.3",
+    "pyqt5>=5.15.11",
     "scipy>=1.18.0",
     "torch>=2.13.0",
     "tqdm>=4.68.4",
