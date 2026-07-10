@@ -1,0 +1,255 @@
+\ProvidesPackage{report}
+
+% FOR LANGUAGE
+\RequirePackage[utf8]{inputenc}
+\RequirePackage[english]{babel}
+
+% FOR MATH
+\RequirePackage{mathtools}
+\RequirePackage{amssymb,amsmath,amsthm}
+\RequirePackage[mathscr]{eucal}
+\RequirePackage[arrow, matrix, curve]{xy}
+
+% FOR PHYSICS
+%\RequirePackage{pdfpages}
+\RequirePackage{float}
+\RequirePackage{physics}
+\RequirePackage{siunitx}
+\sisetup{
+  locale = DE,
+	separate-uncertainty,
+	range-units = brackets,
+	list-units = brackets,
+	per-mode = symbol-or-fraction,
+  table-format=1.2,   % Adjust this based on expected number width
+}
+
+% FOR CODE
+\RequirePackage[linesnumbered,ruled,vlined]{algorithm2e}
+%\RequirePackage{minted}
+
+% FOR CHEMISTRY
+\RequirePackage[version=4]{mhchem}
+
+% FOR TABLES AND FIGURES
+\RequirePackage{booktabs} % better table formatting
+\RequirePackage{subcaption}
+\RequirePackage[font=small,labelfont=bf]{caption}
+\RequirePackage[table]{xcolor}
+\RequirePackage{colortbl}       % needed for row coloring
+\captionsetup{justification=centering}
+\RequirePackage{tabularx}
+%\RequirePackage{multicol}
+\RequirePackage{makecell}
+\RequirePackage{dcolumn} % Align table columns on decimal point}
+%Arithmetics
+\RequirePackage{fp}
+% FOR FORMATTING AND OTHER STUFF
+\RequirePackage{booktabs}
+\RequirePackage{bbm}
+\RequirePackage{bm}
+\RequirePackage{graphicx}
+\RequirePackage{csquotes}
+\RequirePackage{parskip}
+\RequirePackage{setspace}
+\RequirePackage{circuitikz}
+\RequirePackage{verbatim}
+\RequirePackage[hidelinks]{hyperref}
+\RequirePackage{cleveref}
+%\RequirePackage[backend=biber,style=numeric,sorting=none]{biblatex}
+\RequirePackage[]{acronym}
+\RequirePackage[ddmmyyyy]{datetime}
+\renewcommand{\dateseparator}{.}
+\RequirePackage{array}
+\newcolumntype{L}{>{$}l<{$}}
+\newcolumntype{C}{>{$}c<{$}}
+\newcolumntype{R}{>{$}r<{$}}
+
+% Custom SI units
+\DeclareSIUnit\scale{Skt} % Skalenteile
+\DeclareSIUnit\pixel{px} % Pixel
+\DeclareSIUnit\dBm{dBm}
+
+% Some useful commands
+\renewcommand{\l}{\left}
+\renewcommand{\r}{\right}
+\newcommand{\floor}[1]{\lfloor #1 \rfloor}
+\newcommand{\ceil}[1]{\lceil #1 \rceil}
+\newcommand{\f}[1]{\mathrm{#1}}
+\newcommand{\trm}[1]{\textrm{#1}}
+\newcommand{\eps}{\varepsilon}
+\newcommand{\zz}{\textnormal{Z\kern-.3em\raise-0.5ex\hbox{Z}:}}
+
+% single letters in different fonts
+
+%%%%%%%%%%%% mathematical bold  %%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\bA}{\mathbb{A}}
+\newcommand{\bB}{\mathbb{B}}
+\newcommand{\bC}{\mathbb{C}}
+\newcommand{\bD}{\mathbb{D}}
+\newcommand{\bE}{\mathbb{E}}
+\newcommand{\bF}{\mathbb{F}}
+\newcommand{\bG}{\mathbb{G}}
+\newcommand{\bH}{\mathbb{H}}
+\newcommand{\bI}{\mathbb{I}}
+\newcommand{\bJ}{\mathbb{J}}
+\newcommand{\bK}{\mathbb{K}}
+\newcommand{\bL}{\mathbb{L}}
+\newcommand{\bM}{\mathbb{M}}
+\newcommand{\bN}{\mathbb{N}}
+\newcommand{\bO}{\mathbb{O}}
+\newcommand{\bP}{\mathbb{P}}
+\newcommand{\bQ}{\mathbb{Q}}
+\newcommand{\bR}{\mathbb{R}}
+\newcommand{\bS}{\mathbb{S}}
+\newcommand{\bT}{\mathbb{T}}
+\newcommand{\bU}{\mathbb{U}}
+\newcommand{\bV}{\mathbb{V}}
+\newcommand{\bW}{\mathbb{W}}
+\newcommand{\bX}{\mathbb{X}}
+\newcommand{\bY}{\mathbb{Y}}
+\newcommand{\bZ}{\mathbb{Z}}
+\newcommand{\one}{\mathbbm{1}}
+
+
+%%%%%%%%% calligraphic %%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\mc}[1]{\mathcal{#1}}
+
+\newcommand{\cA}{\mathcal{A}}
+\newcommand{\cB}{\mathcal{B}}
+\newcommand{\cC}{\mathcal{C}}
+\newcommand{\cD}{\mathcal{D}}
+\newcommand{\cE}{\mathcal{E}}
+\newcommand{\cF}{\mathcal{F}}
+\newcommand{\cG}{\mathcal{G}}
+\newcommand{\cH}{\mathcal{H}}
+\newcommand{\cI}{\mathcal{I}}
+\newcommand{\cJ}{\mathcal{J}}
+\newcommand{\cK}{\mathcal{K}}
+\newcommand{\cL}{\mathcal{L}}
+\newcommand{\cM}{\mathcal{M}}
+\newcommand{\cN}{\mathcal{N}}
+\newcommand{\cO}{\mathcal{O}}
+\newcommand{\cP}{\mathcal{P}}
+\newcommand{\cQ}{\mathcal{Q}}
+\newcommand{\cR}{\mathcal{R}}
+\newcommand{\cS}{\mathcal{S}}
+\newcommand{\cT}{\mathcal{T}}
+\newcommand{\cU}{\mathcal{U}}
+\newcommand{\cV}{\mathcal{V}}
+\newcommand{\cW}{\mathcal{W}}
+\newcommand{\cX}{\mathcal{X}}
+\newcommand{\cY}{\mathcal{Y}}
+\newcommand{\cZ}{\mathcal{Z}}
+
+
+%%%%%%%%%%%%% mathematical fraktur  %%%%%%%%%%%%%%%%%%%%%
+\newcommand{\mf}[1]{\mathfrak{#1}}
+
+\newcommand{\fA}{\mathfrak{A}}
+\newcommand{\fB}{\mathfrak{B}}
+\newcommand{\fC}{\mathfrak{C}}
+\newcommand{\fD}{\mathfrak{D}}
+\newcommand{\fE}{\mathfrak{E}}
+\newcommand{\fF}{\mathfrak{F}}
+\newcommand{\fG}{\mathfrak{G}}
+\newcommand{\fH}{\mathfrak{H}}
+\newcommand{\fI}{\mathfrak{I}}
+\newcommand{\fJ}{\mathfrak{J}}
+\newcommand{\fK}{\mathfrak{K}}
+\newcommand{\fL}{\mathfrak{L}}
+\newcommand{\fM}{\mathfrak{M}}
+\newcommand{\fN}{\mathfrak{N}}
+\newcommand{\fO}{\mathfrak{O}}
+\newcommand{\fP}{\mathfrak{P}}
+\newcommand{\fQ}{\mathfrak{Q}}
+\newcommand{\fR}{\mathfrak{R}}
+\newcommand{\fS}{\mathfrak{S}}
+\newcommand{\fT}{\mathfrak{T}}
+\newcommand{\fU}{\mathfrak{U}}
+\newcommand{\fV}{\mathfrak{V}}
+\newcommand{\fW}{\mathfrak{W}}
+\newcommand{\fX}{\mathfrak{X}}
+\newcommand{\fY}{\mathfrak{Y}}
+\newcommand{\fZ}{\mathfrak{Z}}
+
+
+%%%%%%%%%%%%% mathematical script (euler)  %%%%%%%%%%%%%%%%%%%%%
+\newcommand{\ms}[1]{\mathscr{#1}}
+
+\newcommand{\sA}{\mathscr{A}}
+\newcommand{\sB}{\mathscr{B}}
+\newcommand{\sC}{\mathscr{C}}
+\newcommand{\sD}{\mathscr{D}}
+\newcommand{\sE}{\mathscr{E}}
+\newcommand{\sF}{\mathscr{F}}
+\newcommand{\sG}{\mathscr{G}}
+\newcommand{\sH}{\mathscr{H}}
+\newcommand{\sI}{\mathscr{I}}
+\newcommand{\sJ}{\mathscr{J}}
+\newcommand{\sK}{\mathscr{K}}
+\newcommand{\sL}{\mathscr{L}}
+\newcommand{\sM}{\mathscr{M}}
+\newcommand{\sN}{\mathscr{N}}
+\newcommand{\sO}{\mathscr{O}}
+\newcommand{\sP}{\mathscr{P}}
+\newcommand{\sQ}{\mathscr{Q}}
+\newcommand{\sR}{\mathscr{R}}
+\newcommand{\sS}{\mathscr{S}}
+\newcommand{\sT}{\mathscr{T}}
+\newcommand{\sU}{\mathscr{U}}
+\newcommand{\sV}{\mathscr{V}}
+\newcommand{\sW}{\mathscr{W}}
+\newcommand{\sX}{\mathscr{X}}
+\newcommand{\sY}{\mathscr{Y}}
+\newcommand{\sZ}{\mathscr{Z}}
+
+%%%%%%%%%%%%% Atomic notation  %%%%%%%%%%%%%%%%%%%%%
+% Maps Orbial angular momentum to Letter
+\newcommand{\Lletter}[1]{%
+  \ifcase#1
+    S% L = 0
+  \or P% L = 1
+  \or D% L = 2
+  \or F% L = 3
+  \or G% L = 4
+  \or H% L = 5
+  \or I% L = 6
+  \else
+    X% fallback for unknown L
+  \fi
+}
+% Writes number as fraction or integer
+\newcommand{\FmtF}[1]{%
+  \FPifint{#1}%
+    % F is integer
+    \FPround\RoundedValue{#1}{0}%
+    \RoundedValue
+  \else
+    % F is not integer: compute 2F, round to integer, print 2F/2
+    \FPmul\Fdouble{2}{#1}%
+    \FPround\Fdouble{\Fdouble}{0}%
+    \Fdouble/2%
+  \fi
+}
+%%% Takes n,S,L,I and returns state in atomic notaion
+\newcommand{\hfstate}[4]{%
+  % S_abs = |S|
+  \FPset\S{#2}%
+  \FPabs\Sabs{\S}%
+  % multiplicity: mult = 2*S_abs + 1
+  \FPmul\mult{2}{\Sabs}%
+  \FPadd\mult{\mult}{1}%
+  \FPround\mult{\mult}{0}%
+  % J = L + S_abs
+  \FPset\Lval{#3}%
+  \FPadd\J{\Lval}{\Sabs}%
+  \FPround\J{\J}{3}%
+  % F = I + J
+  \FPset\Ival{#4}%
+  \FPadd\F{\Ival}{\J}%
+  \FPround\F{\F}{3}%
+  %
+  \ensuremath{#1\,^{\mult}\Lletter{#3}_{\FmtF{\F}}}%
+}

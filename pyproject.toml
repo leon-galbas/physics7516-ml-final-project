@@ -1,0 +1,18 @@
+[project]
+name = "physics7516-ml-final-project"
+version = "0.1.0"
+description = "Final project of the 2026 Summer Term Lecture 'physics7516: Machine Learning for Quantum Scientists' at the University of Bonn"
+authors = [
+    { name = "Leon Galbas", email = "contact@leon-galbas.de" }
+]
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "jupyter>=1.1.1",
+    "matplotlib>=3.11.0",
+    "numpy>=2.5.1",
+    "pandas>=3.0.3",
+    "scipy>=1.18.0",
+    "torch>=2.13.0",
+    "tqdm>=4.68.4",
+]

@@ -1,0 +1,70 @@
+% ****** Start of file report.tex ******
+%
+%   This file is part of the APS files in the REVTeX 4.2 distribution.
+%   Version 4.2a of REVTeX, December 2014
+%
+%   Copyright (c) 2014 The American Physical Society.
+%
+%   See the REVTeX 4 README file for restrictions and more information.
+%
+% TeX'ing this file requires that you have AMS-LaTeX 2.0 installed
+% as well as the rest of the prerequisites for REVTeX 4.2
+%
+% See the REVTeX 4 README file
+\documentclass[%
+ reprint,
+%superscriptaddress,
+%groupedaddress,
+%unsortedaddress,
+runinaddress,
+%frontmatterverbose,
+%preprint,
+%preprintnumbers,
+%nofootinbib,
+%nobibnotes,
+%bibnotes,
+ amsmath,amssymb,
+ aps,
+%pra,
+%prb,
+%rmp,
+%prstab,
+%prstper,
+%floatfix,
+]{revtex4-2}
+\usepackage{report}
+\begin{document}
+
+\preprint{APS/123-QED}
+\input{sections/01_title}
+\input{sections/02_abstract}
+\maketitle
+
+
+
+%\tableofcontents
+
+\section{Introduction \label{sec:intro}}
+\input{sections/03_intro}
+
+\section{Generating the Data \label{sec:data}}
+\input{sections/04_data}
+
+\section{Methods \label{sec:methods}}
+\input{sections/05_methods}
+
+\section{Results \label{sec:results}}
+\input{sections/06_results}
+
+\section{Conclusion \label{sec:conslusion}}
+\input{sections/07_conclusion}
+
+
+\bibliography{references}% Produces the bibliography via BibTeX.
+
+\section*{Appendix \label{sec:appendix}}
+\clearpage
+\input{sections/08_appendix}
+
+
+\end{document}
