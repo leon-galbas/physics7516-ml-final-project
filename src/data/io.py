@@ -3,8 +3,6 @@ import logging
 import numpy as np
 import yaml
 
-from src.config import DEFAULT_DATASET_CONFIG
-
 logger = logging.getLogger(__name__)
 
 
@@ -58,7 +56,7 @@ def load_dataset(
     return trajectories, launch_params, trajectory_characteristics
 
 
-def read_dataset_config(config_file: str) -> dict | None:
+def read_dataset_config(config_file: str) -> dict:
     try:
         logger.info(f"Reading dataset config from '{config_file}'.")
         with open(config_file, "r") as file:
@@ -67,15 +65,6 @@ def read_dataset_config(config_file: str) -> dict | None:
     except Exception as e:
         logger.warning(
             f"Reading the specified config failed with error: {e}. "
-            "Reading default config instead."
+            "Using default values instead."
         )
-        try:
-            with open(DEFAULT_DATASET_CONFIG, "r") as file:
-                config = yaml.safe_load(file)
-            return config
-        except Exception as e:
-            logger.warning(
-                f"Reading the default config also failed with error: {e}. "
-                "Returning None."
-            )
-            return None
+        return {}

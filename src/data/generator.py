@@ -14,49 +14,38 @@ class TrajectoryGenerator:
 
     def __init__(
         self,
-        launch_parameter_ranges: dict[str, tuple[float, float]] = {},  # pyright: ignore[reportCallInDefaultInitializer]
-        g: float = 9.81,
-        omega: list[float] = [1.0, 1.0, 1.0],  # pyright: ignore[reportCallInDefaultInitializer]
-        t_max: float = 100.0,
-        n_timepoints: int = 1000,
-        eps: float = 1e-3,
         seed: int = 42,
+        **kwargs,
     ) -> None:
-        # initialize launch parameter ranges
-        self.v0_range: tuple[float, float] = launch_parameter_ranges.get(
-            "v0", (0.0, 75.0)
-        )
-        self.theta_range: tuple[float, float] = launch_parameter_ranges.get(
-            "theta", (0.0, np.pi / 2 - eps)
-        )
-        self.phi_range: tuple[float, float] = launch_parameter_ranges.get(
-            "phi", (0.0, 2 * np.pi - eps)
-        )
-        self.beta_D_range: tuple[float, float] = launch_parameter_ranges.get(
-            "beta_D", (0.003, 0.04)
-        )
-        self.beta_M_range: tuple[float, float] = launch_parameter_ranges.get(
-            "beta_M", (0.0, 0.3)
-        )
-        self.u_mag_range: tuple[float, float] = launch_parameter_ranges.get(
-            "u_mag", (0.0, 25)
-        )
-        self.u_theta_range: tuple[float, float] = launch_parameter_ranges.get(
-            "u_theta", (0.0, np.pi)
-        )
-        self.u_phi_range: tuple[float, float] = launch_parameter_ranges.get(
-            "u_phi", (0.0, 2 * np.pi - eps)
-        )
+        # initialize general parameters
+        self.t_max: float = kwargs.get("t_max", 100.0)
+        self.n_timepoints: int = kwargs.get("n_timepoints", 10000)
+        self.eps: float = kwargs.get("eps", 1e-6)
 
-        # initialize additional parameters
-        self.g: float = g
+        # initialize launch parameters
+        self.v0_range: tuple[float, float] = kwargs.get("v0_range", (0.0, 75.0))
+        self.theta_range: tuple[float, float] = kwargs.get(
+            "theta_range", (0.0, np.pi / 2 - self.eps)
+        )
+        self.phi_range: tuple[float, float] = kwargs.get(
+            "phi_range", (0.0, 2 * np.pi - self.eps)
+        )
+        self.beta_D_range: tuple[float, float] = kwargs.get(
+            "beta_D_range", (0.003, 0.04)
+        )
+        self.beta_M_range: tuple[float, float] = kwargs.get("beta_M_range", (0.0, 0.3))
+        self.u_mag_range: tuple[float, float] = kwargs.get("u_mag_range", (0.0, 25))
+        self.u_theta_range: tuple[float, float] = kwargs.get(
+            "u_theta_range", (0.0, np.pi)
+        )
+        self.u_phi_range: tuple[float, float] = kwargs.get(
+            "u_phi_range", (0.0, 2 * np.pi - self.eps)
+        )
+        self.g: float = kwargs.get("g", 9.81)
+        omega: list[float] = kwargs.get("omega", [1.0, 1.0, 1.0])
         if len(omega) != 3:
             raise ValueError("Omega must be a 3D vector!")
         self.omega: np.ndarray = np.array(omega) / np.linalg.norm(omega)
-        self.t_max: float = t_max
-        self.n_timepoints: int = n_timepoints
-        self.eps: float = eps
-        self.seed: int = seed
 
         # initialize random number generator
         self.rng: np.random.Generator = np.random.default_rng(seed=seed)

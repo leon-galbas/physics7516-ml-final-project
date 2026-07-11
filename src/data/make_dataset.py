@@ -1,6 +1,8 @@
 import argparse
 import logging
+from os import path
 
+from src.config import DATA_DIR
 from src.data.generator import TrajectoryGenerator
 from src.data.io import read_dataset_config, save_dataset
 
@@ -18,20 +20,19 @@ def main(outfile: str, config_file: str | None = None) -> None:
             generates a dataset of 1000 samples with default parameters.
             Defaults to None.
     """
+    output_path = path.join(DATA_DIR, outfile)
+
     if config_file is not None:
         config = read_dataset_config(config_file)
     else:
-        config = None
+        config = {}
 
-    if config is None:
-        logger.info("Running dataset generation with the default configuration.")
-        gen = TrajectoryGenerator()
-        trajectories, launch_params, trajectory_characteristics = gen.generate(
-            1000, verbose=True
-        )
-        save_dataset(outfile, trajectories, launch_params, trajectory_characteristics)
-    else:
-        pass  # TODO
+    n_samples = config.get("n_samples", 1000)
+    gen = TrajectoryGenerator()
+    trajectories, launch_params, trajectory_characteristics = gen.generate(
+        n_samples, verbose=True
+    )
+    save_dataset(output_path, trajectories, launch_params, trajectory_characteristics)
 
 
 if __name__ == "__main__":
@@ -43,7 +44,7 @@ if __name__ == "__main__":
 
     # Parse command line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("outfile", help="Output file for the dataset.")
+    parser.add_argument("outfile", help="Filename for the dataset.")
     parser.add_argument("-c", "--config", help="Configuration file.", default=None)
     args = parser.parse_args()
 
