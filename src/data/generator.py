@@ -1,8 +1,16 @@
+import logging
+
 import numpy as np
 from scipy.integrate import solve_ivp
+from tqdm import tqdm
+
+logger = logging.getLogger(__name__)
 
 
 class TrajectoryGenerator:
+    # constant class variables
+    n_launch_params: int = 8
+
     def __init__(
         self,
         launch_parameter_ranges: dict[str, tuple[float, float]] = {},  # pyright: ignore[reportCallInDefaultInitializer]
@@ -51,6 +59,34 @@ class TrajectoryGenerator:
 
         # initialize random number generator
         self.rng: np.random.Generator = np.random.default_rng(seed=seed)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return self._generate_sample()
+
+    def generate(
+        self, n_samples: int, verbose: bool = False
+    ) -> tuple[np.ndarray, np.ndarray]:
+        trajectories = np.empty((n_samples, self.n_timepoints, 4))
+        launch_params = np.empty((n_samples, self.n_launch_params))
+
+        logger.info(
+            f"Generating {n_samples} trajectories with {self.n_timepoints} timepoints each."
+        )
+
+        iterator = range(n_samples)
+        if verbose:
+            iterator = tqdm(iterator)
+        for i in iterator:
+            traj, params = next(self)
+            trajectories[i] = traj
+            launch_params[i] = params
+
+        logger.info("Done!")
+
+        return trajectories, launch_params
 
     def _get_launch_parameters(self) -> np.ndarray:
         v0 = self.rng.uniform(*self.v0_range)
@@ -154,8 +190,4 @@ class TrajectoryGenerator:
         launch_params = self._get_launch_parameters()
         trajectory = self._compute_trajectory(launch_params)
 
-        return launch_params, trajectory
-
-    def __iter__(self):
-        while True:
-            yield self._generate_sample()
+        return trajectory, launch_params
