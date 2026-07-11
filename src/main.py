@@ -8,11 +8,11 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    filename = "dataset_100000_default.npz"
-    make_dataset(filename, config_file="config/dataset/dataset.yaml")
-    X, Y, Z = load_dataset(filename)
-    plot_trajectories_3d(X[:10], outfile="multiple_trajectories.pdf")
-    plot_trajectory_3d(X[11], Y[11], outfile="single_trajectory.pdf")
+    dataset_name = "dataset_200000x1000_default"
+    make_dataset(dataset_name)
+    X, Y, Z = load_dataset(dataset_name)
+    plot_trajectories_3d(X[1000:1010], outfile="multiple_trajectories.pdf")
+    plot_trajectory_3d(X[1011], Y[1011], outfile="single_trajectory.pdf")
     print("Success!")
 
 

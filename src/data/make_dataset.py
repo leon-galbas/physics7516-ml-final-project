@@ -2,37 +2,60 @@ import argparse
 import logging
 from os import path
 
-from src.config import DATA_DIR
+import numpy as np
+
 from src.data.generator import TrajectoryGenerator
-from src.data.io import read_dataset_config, save_dataset
+from src.data.io import (
+    append_dataset,
+    get_dataset_filename,
+    read_dataset_config,
+    save_dataset,
+)
 
 logger = logging.getLogger(__name__)
 
 
-def main(outfile: str, config_file: str | None = None) -> None:
+def main(dataset_name: str, overwrite: bool = False) -> None:
     """Generates and saves a dataset of launch parameters and simulated trajectories.
 
     Args:
-        outfile (str): Path for the saved dataset.
-        config_file (str | None, optional): Path to the configuration file for the data-
-            set to be generated. If None is given or individual values are missing,
-            tries to load 'config/dataset/default.yaml'. If this does not exist,
-            generates a dataset of 1000 samples with default parameters.
-            Defaults to None.
+        dataset_name (str): Name of the dataset.
+        overwrite (bool): Whether to overwrite an existing dataset of the same name.
+            Defaults to False.
     """
-    output_path = path.join(DATA_DIR, outfile)
+    # check if dataset already exists
+    if path.exists(get_dataset_filename(dataset_name)) and not overwrite:
+        logger.warning(
+            f"A dataset of the name '{dataset_name}' already exists. Skipping..."
+        )
+        return
 
-    if config_file is not None:
-        config = read_dataset_config(config_file)
-    else:
-        config = {}
+    # read config
+    config = read_dataset_config(dataset_name)
 
+    # initialize generator
+    gen = TrajectoryGenerator(**config)
+
+    # generate data (periodically save to avoid data loss)
     n_samples = config.get("n_samples", 1000)
-    gen = TrajectoryGenerator()
-    trajectories, launch_params, trajectory_characteristics = gen.generate(
-        n_samples, verbose=True
-    )
-    save_dataset(output_path, trajectories, launch_params, trajectory_characteristics)
+    generation_batch_size = 10000
+    n_batches = int(np.ceil(n_samples / generation_batch_size))
+
+    logger.info(f"Starting to generate dataset of {n_samples} samples...")
+    for i in range(n_batches):
+        logger.info(f"Generating batch {i + 1}/{n_batches}.")
+        trajectories, launch_params, trajectory_characteristics = gen.generate(
+            min(n_samples, generation_batch_size), verbose=True
+        )
+        if i == 0:
+            save_dataset(
+                dataset_name, trajectories, launch_params, trajectory_characteristics
+            )
+        else:
+            append_dataset(
+                dataset_name, trajectories, launch_params, trajectory_characteristics
+            )
+        n_samples -= generation_batch_size
 
 
 if __name__ == "__main__":
@@ -44,11 +67,16 @@ if __name__ == "__main__":
 
     # Parse command line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("outfile", help="Filename for the dataset.")
-    parser.add_argument("-c", "--config", help="Configuration file.", default=None)
+    parser.add_argument("name", help="Name for the dataset.")
+    parser.add_argument(
+        "-o",
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing dataset of the same name.",
+    )
     args = parser.parse_args()
 
-    outfile = args.outfile
-    config_file = args.config
+    dataset_name = args.name
+    overwrite = args.overwrite
 
-    main(outfile, config_file=config_file)
+    main(dataset_name, overwrite=overwrite)
