@@ -8,11 +8,12 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    dataset_name = "dataset_200000x1000_default"
-    make_dataset(dataset_name)
-    X, Y, Z = load_dataset(dataset_name)
-    plot_trajectories_3d(X[1000:1010], outfile="multiple_trajectories.pdf")
-    plot_trajectory_3d(X[1011], Y[1011], outfile="single_trajectory.pdf")
+    datasets = ["example", "example_gauss-noise", "example_random-walk-noise"]
+    for dataset in datasets:
+        make_dataset(dataset)
+        X, Y, Z = load_dataset(dataset)
+        plot_trajectories_3d(X[100:110])
+        plot_trajectory_3d(X[111], Y[111])
     print("Success!")
 
 

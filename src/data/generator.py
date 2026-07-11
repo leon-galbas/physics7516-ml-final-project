@@ -51,6 +51,10 @@ class TrajectoryGenerator:
                 * ``u_phi_range``: Wind azimuth angle range.
                 * ``g``: Gravitational acceleration.
                 * ``omega``: Three-dimensional unit vector defining the spin axis.
+                * ``noise_coeffs``: Three-dimensional unit vector containing coefficients
+                    for calculating the noise in each dimension.
+                * ``noise_type``: Type of noise. Allowed values are
+                    'gauss', 'random-walk', 'none' (default)
 
         Raises:
             ValueError: If ``omega`` is not a three-dimensional vector.
@@ -84,6 +88,13 @@ class TrajectoryGenerator:
         if len(omega) != 3:
             raise ValueError("Omega must be a 3D vector!")
         self.omega: np.ndarray = np.array(omega) / np.linalg.norm(omega)
+        noise_coeffs: list[float] = kwargs.get("noise_coeffs", [0.01, 0.01, 0.01])
+        if len(noise_coeffs) != 3:
+            raise ValueError("Noise coefficients must be a 3D vector!")
+        self.noise_coeffs: np.ndarray = np.array(noise_coeffs)
+        self.noise_type: str = kwargs.get("noise_type", "none")
+        if self.noise_type not in ["gauss", "random-walk", "none"]:
+            raise ValueError(f"The noise type {self.noise_type} is not implemented!")
 
         # initialize random number generator
         self.rng: np.random.Generator = np.random.default_rng(seed=seed)
@@ -270,6 +281,28 @@ class TrajectoryGenerator:
 
         return trajectory, characteristics
 
+    def _add_noise(self, trajectory: np.ndarray) -> np.ndarray:
+        match self.noise_type:
+            case "gauss":
+                noise = self.rng.normal(
+                    0.0, self.noise_coeffs, size=trajectory[:, 1:].shape
+                )
+                trajectory[:, 1:] += noise
+            case "random-walk":
+                increments = self.rng.normal(
+                    0.0, self.noise_coeffs, size=trajectory[:, 1:].shape
+                )
+                drift = np.cumsum(increments, axis=0)
+                trajectory[:, 1:] += drift
+            case "none":
+                pass
+            case _:
+                raise ValueError(
+                    f"The noise type '{self.noise_type}' is not implemented!"
+                )
+
+        return trajectory
+
     def _generate_sample(
         self, max_tries: int = 100, return_raw: bool = False
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -289,6 +322,7 @@ class TrajectoryGenerator:
                 trajectory, characteristics = (
                     self._resample_and_compute_characteristics(raw_trajectory)
                 )
+                trajectory = self._add_noise(trajectory)
                 success = True
             except Exception:
                 self._fail_count += 1
