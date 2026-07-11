@@ -26,8 +26,10 @@ def main(outfile: str, config_file: str | None = None) -> None:
     if config is None:
         logger.info("Running dataset generation with the default configuration.")
         gen = TrajectoryGenerator()
-        trajectories, launch_params = gen.generate(1000, verbose=True)
-        save_dataset(outfile, trajectories, launch_params)
+        trajectories, launch_params, trajectory_characteristics = gen.generate(
+            1000, verbose=True
+        )
+        save_dataset(outfile, trajectories, launch_params, trajectory_characteristics)
     else:
         pass  # TODO
 

@@ -1,7 +1,7 @@
 import logging
 
 import numpy as np
-from scipy.integrate import solve_ivp
+from scipy.integrate import OdeSolution, solve_ivp
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 class TrajectoryGenerator:
     # constant class variables
     n_launch_params: int = 8
+    n_trajectory_characteristics: int = 8
 
     def __init__(
         self,
@@ -72,9 +73,10 @@ class TrajectoryGenerator:
 
     def generate(
         self, n_samples: int, verbose: bool = False
-    ) -> tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         trajectories = np.empty((n_samples, self.n_timepoints, 4))
         launch_params = np.empty((n_samples, self.n_launch_params))
+        traj_characs = np.empty((n_samples, self.n_trajectory_characteristics))
 
         logger.info(
             f"Generating {n_samples} trajectories with {self.n_timepoints} timepoints each."
@@ -84,13 +86,14 @@ class TrajectoryGenerator:
         if verbose:
             iterator = tqdm(iterator)
         for i in iterator:
-            traj, params = next(self)
+            traj, params, characs = next(self)
             trajectories[i] = traj
             launch_params[i] = params
+            traj_characs[i] = characs
 
         logger.info(f"Done! Fail ratio: {self.fail_ratio:.4f}")
 
-        return trajectories, launch_params
+        return trajectories, launch_params, traj_characs
 
     @property
     def fail_ratio(self) -> float:
@@ -108,7 +111,7 @@ class TrajectoryGenerator:
 
         return np.array([v0, theta, phi, beta_D, beta_M, u_mag, u_theta, u_phi])
 
-    def _compute_trajectory(self, launch_parameters: np.ndarray) -> np.ndarray:
+    def _compute_trajectory(self, launch_parameters: np.ndarray) -> OdeSolution:
         v0, theta, phi, beta_D, beta_M, u_mag, u_theta, u_phi = launch_parameters
 
         # Wind vector
@@ -167,7 +170,7 @@ class TrajectoryGenerator:
         setattr(event_hit_ground, "terminal", True)
         setattr(event_hit_ground, "direction", -1)
 
-        sol = solve_ivp(
+        sol: OdeSolution = solve_ivp(
             rhs,
             t_span=(0.0, self.t_max),
             y0=y_initial,
@@ -177,27 +180,39 @@ class TrajectoryGenerator:
             atol=1e-10,
         )
 
-        # Reject trajectories that did not hit the ground
-        if len(sol.t_events[0]) == 0 or sol.status != 1:
-            raise RuntimeError("Trajectory did not hit the ground within t_max.")
+        return sol
 
-        t_hit = sol.t_events[0][0]
+    def _resample_and_compute_characteristics(
+        self, sol: OdeSolution
+    ) -> tuple[np.ndarray, np.ndarray]:
+        # Reject trajectories that did not hit the ground
+        if len(sol.t_events[0]) == 0 or sol.status != 1:  # pyright: ignore[reportAttributeAccessIssue]
+            raise RuntimeError("Trajectory did not hit the ground within t_max.")
+        t_hit = sol.t_events[0][0]  # pyright: ignore[reportAttributeAccessIssue]
 
         # Resample to fixed length
         tau = np.linspace(0.0, 1.0, self.n_timepoints)
         t_eval = tau * t_hit
-
-        states = sol.sol(t_eval).T
-
+        states = sol.sol(t_eval).T  # pyright: ignore[reportAttributeAccessIssue]
         x = states[:, 0]
         y = states[:, 1]
         z = states[:, 2]
-
         trajectory = np.stack([t_eval, x, y, z], axis=1)
 
-        return trajectory
+        # Compute characteristics
+        x_absmax, y_absmax, z_absmax = np.max(np.abs(trajectory), axis=0)[1:]
+        x_hit, y_hit = trajectory[-1, 1:3]
+        traj_dist = np.linalg.norm(np.array([x_hit, y_hit]))
+        traj_length = np.sum(np.linalg.norm(np.diff(trajectory[:, 1:], axis=0), axis=1))
+        characteristics = np.array(
+            [t_hit, x_hit, y_hit, x_absmax, y_absmax, z_absmax, traj_dist, traj_length]
+        )
 
-    def _generate_sample(self, max_tries: int = 100) -> tuple[np.ndarray, np.ndarray]:
+        return trajectory, characteristics
+
+    def _generate_sample(
+        self, max_tries: int = 100, return_raw: bool = False
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         success = False
         try_count = 0
 
@@ -210,9 +225,12 @@ class TrajectoryGenerator:
                 self._run_count += 1
                 try_count += 1
                 launch_params = self._get_launch_parameters()
-                trajectory = self._compute_trajectory(launch_params)
+                raw_trajectory = self._compute_trajectory(launch_params)
+                trajectory, characteristics = (
+                    self._resample_and_compute_characteristics(raw_trajectory)
+                )
                 success = True
             except Exception:
                 self._fail_count += 1
 
-        return trajectory, launch_params
+        return trajectory, launch_params, characteristics

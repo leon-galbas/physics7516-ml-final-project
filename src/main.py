@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 def main():
     filename = "data/test.npz"
     make_dataset(filename)
-    X, Y = load_dataset(filename)
+    X, Y, Z = load_dataset(filename)
     plot_trajectories_3d(X[:10], outfile="multiple_trajectories.pdf")
     plot_trajectory_3d(X[11], Y[11], outfile="single_trajectory.pdf")
     print("Success!")
