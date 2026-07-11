@@ -23,7 +23,7 @@ class TrajectoryGenerator:
     ) -> None:
         # initialize launch parameter ranges
         self.v0_range: tuple[float, float] = launch_parameter_ranges.get(
-            "v0", (0.0, 100.0)
+            "v0", (0.0, 75.0)
         )
         self.theta_range: tuple[float, float] = launch_parameter_ranges.get(
             "theta", (0.0, np.pi / 2 - eps)
@@ -32,19 +32,19 @@ class TrajectoryGenerator:
             "phi", (0.0, 2 * np.pi - eps)
         )
         self.beta_D_range: tuple[float, float] = launch_parameter_ranges.get(
-            "beta_D", (0.0, 0.1)
+            "beta_D", (0.003, 0.04)
         )
         self.beta_M_range: tuple[float, float] = launch_parameter_ranges.get(
-            "beta_M", (0.0, 0.1)
+            "beta_M", (0.0, 0.3)
         )
-        self.ux_range: tuple[float, float] = launch_parameter_ranges.get(
-            "ux", (0.0, 10)
+        self.u_mag_range: tuple[float, float] = launch_parameter_ranges.get(
+            "u_mag", (0.0, 25)
         )
-        self.uy_range: tuple[float, float] = launch_parameter_ranges.get(
-            "uy", (0.0, 10)
+        self.u_theta_range: tuple[float, float] = launch_parameter_ranges.get(
+            "u_theta", (0.0, np.pi)
         )
-        self.uz_range: tuple[float, float] = launch_parameter_ranges.get(
-            "uz", (0.0, 10)
+        self.u_phi_range: tuple[float, float] = launch_parameter_ranges.get(
+            "u_phi", (0.0, 2 * np.pi - eps)
         )
 
         # initialize additional parameters
@@ -59,6 +59,10 @@ class TrajectoryGenerator:
 
         # initialize random number generator
         self.rng: np.random.Generator = np.random.default_rng(seed=seed)
+
+        # Track how many generations yielded trajectories that did not reach the ground
+        self._run_count: int = 0
+        self._fail_count: int = 0
 
     def __iter__(self):
         return self
@@ -84,9 +88,13 @@ class TrajectoryGenerator:
             trajectories[i] = traj
             launch_params[i] = params
 
-        logger.info("Done!")
+        logger.info(f"Done! Fail ratio: {self.fail_ratio:.4f}")
 
         return trajectories, launch_params
+
+    @property
+    def fail_ratio(self) -> float:
+        return self._fail_count / self._run_count
 
     def _get_launch_parameters(self) -> np.ndarray:
         v0 = self.rng.uniform(*self.v0_range)
@@ -94,16 +102,19 @@ class TrajectoryGenerator:
         phi = self.rng.uniform(*self.phi_range)
         beta_D = self.rng.uniform(*self.beta_D_range)
         beta_M = self.rng.uniform(*self.beta_M_range)
-        ux = self.rng.uniform(*self.ux_range)
-        uy = self.rng.uniform(*self.uy_range)
-        uz = self.rng.uniform(*self.uz_range)
+        u_mag = self.rng.uniform(*self.u_mag_range)
+        u_theta = self.rng.uniform(*self.u_theta_range)
+        u_phi = self.rng.uniform(*self.u_phi_range)
 
-        return np.array([v0, theta, phi, beta_D, beta_M, ux, uy, uz])
+        return np.array([v0, theta, phi, beta_D, beta_M, u_mag, u_theta, u_phi])
 
     def _compute_trajectory(self, launch_parameters: np.ndarray) -> np.ndarray:
-        v0, theta, phi, beta_D, beta_M, ux, uy, uz = launch_parameters
+        v0, theta, phi, beta_D, beta_M, u_mag, u_theta, u_phi = launch_parameters
 
         # Wind vector
+        ux = u_mag * np.sin(u_theta) * np.cos(u_phi)
+        uy = u_mag * np.sin(u_theta) * np.sin(u_phi)
+        uz = u_mag * np.cos(u_theta)
         wind = np.array([ux, uy, uz], dtype=float)
 
         # Fixed spin axis. NOTE: Maybe make this a parameter later
@@ -186,8 +197,22 @@ class TrajectoryGenerator:
 
         return trajectory
 
-    def _generate_sample(self) -> tuple[np.ndarray, np.ndarray]:
-        launch_params = self._get_launch_parameters()
-        trajectory = self._compute_trajectory(launch_params)
+    def _generate_sample(self, max_tries: int = 100) -> tuple[np.ndarray, np.ndarray]:
+        success = False
+        try_count = 0
+
+        while not success:
+            if try_count >= max_tries:
+                raise RuntimeError(
+                    f"Sample generation was unsuccessful after {max_tries} tries."
+                )
+            try:
+                self._run_count += 1
+                try_count += 1
+                launch_params = self._get_launch_parameters()
+                trajectory = self._compute_trajectory(launch_params)
+                success = True
+            except Exception:
+                self._fail_count += 1
 
         return trajectory, launch_params

@@ -10,9 +10,7 @@ def main():
     filename = "data/test.npz"
     make_dataset(filename)
     X, Y = load_dataset(filename)
-
-    print(X)
-    print(Y)
+    print("Success!")
 
 
 if __name__ == "__main__":
