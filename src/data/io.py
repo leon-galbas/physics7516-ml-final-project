@@ -3,9 +3,9 @@ import logging
 import numpy as np
 import yaml
 
-logger = logging.getLogger(__name__)
+from src.config import DEFAULT_DATASET_CONFIG
 
-DEFAULT_DATASET_CONFIG = "config/dataset/default.yaml"
+logger = logging.getLogger(__name__)
 
 
 def save_dataset(

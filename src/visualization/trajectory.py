@@ -1,12 +1,21 @@
 import matplotlib as mpl
 
 mpl.use("Qt5Agg")
+import logging
+from os import path
+
 import matplotlib.pyplot as plt
 import numpy as np
 
+from src.config import FIGURE_DIR
+
+logger = logging.getLogger(__name__)
+
 
 def plot_trajectory_3d(
-    trajectory: np.ndarray, launch_parameters: np.ndarray | None = None
+    trajectory: np.ndarray,
+    launch_parameters: np.ndarray | None = None,
+    outfile: str | None = None,
 ) -> None:
     fig = plt.figure()
     ax = fig.add_subplot(projection="3d")
@@ -50,10 +59,10 @@ def plot_trajectory_3d(
 
     # plot launch parameters if given
     if launch_parameters is not None:
-        v0, theta, phi, beta_D, beta_M, ux, uy, uz = launch_parameters
+        v0, theta, phi, beta_D, beta_M, u_mag, u_theta, u_phi = launch_parameters
         params = (
             f"$(v_0,\\theta,\\phi) = ({v0:.2f},{theta:.2f},{phi:.2f})$\n"
-            f"$(u_x,u_y,u_z) = ({ux:.2f},{uy:.2f},{uz:.2f})$\n"
+            f"$(u,u_\\theta,u_\\phi) = ({u_mag:.2f},{u_theta:.2f},{u_phi:.2f})$\n"
             f"$\\beta_D = {beta_D:.2f}$, $\\beta_M = {beta_M:.2f}$"
         )
         fig.text(
@@ -66,17 +75,24 @@ def plot_trajectory_3d(
         )
 
     # format plot
-    ax.set_xlabel("$x$")
-    ax.set_ylabel("$y$")
-    ax.set_zlabel("$z$")
+    ax.set_xlabel("$x$[m]")
+    ax.set_ylabel("$y$[m]")
+    ax.set_zlabel("$z$[m]")
     plt.legend()
 
-    plt.show()
-    plt.close()
+    if outfile is None:
+        plt.show()
+        plt.close()
+    else:
+        plot_path = path.join(FIGURE_DIR, outfile)
+        plt.tight_layout()
+        plt.savefig(plot_path)
+        logger.info(f"Plot saved to '{plot_path}'.")
+        plt.close()
 
 
 def plot_trajectories_3d(
-    trajectories: np.ndarray | list[np.ndarray],
+    trajectories: np.ndarray | list[np.ndarray], outfile: str | None = None
 ) -> None:
     # check values
     if isinstance(trajectories, list):
@@ -144,10 +160,17 @@ def plot_trajectories_3d(
     ax.plot_surface(grid_x, grid_y, grid_z, alpha=0.5, color="grey", label="Ground")
 
     # format plot
-    ax.set_xlabel("$x$")
-    ax.set_ylabel("$y$")
-    ax.set_zlabel("$z$")
+    ax.set_xlabel("$x$[m]")
+    ax.set_ylabel("$y$[m]")
+    ax.set_zlabel("$z$[m]")
     plt.legend()
 
-    plt.show()
-    plt.close()
+    if outfile is None:
+        plt.show()
+        plt.close()
+    else:
+        plot_path = path.join(FIGURE_DIR, outfile)
+        plt.tight_layout()
+        plt.savefig(plot_path)
+        logger.info(f"Plot saved to '{plot_path}'.")
+        plt.close()
