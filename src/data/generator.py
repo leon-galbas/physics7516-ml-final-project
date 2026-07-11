@@ -8,6 +8,21 @@ logger = logging.getLogger(__name__)
 
 
 class TrajectoryGenerator:
+    """Generate simulated projectile trajectories with drag, Magnus force, and wind.
+
+    The generator samples random launch and environmental parameters, numerically
+    integrates the equations of motion, and returns trajectories resampled to a
+    fixed number of time points together with the sampled parameters and several
+    trajectory characteristics.
+
+    Instances are iterable and produce one trajectory sample per iteration.
+
+    Attributes:
+        n_launch_params: Number of sampled launch and environment parameters.
+        n_trajectory_characteristics: Number of computed trajectory summary
+            characteristics.
+    """
+
     # constant class variables
     n_launch_params: int = 8
     n_trajectory_characteristics: int = 8
@@ -17,6 +32,29 @@ class TrajectoryGenerator:
         seed: int = 42,
         **kwargs,
     ) -> None:
+        """Initialize the trajectory generator.
+
+        Args:
+            seed: Seed used to initialize the random number generator.
+            **kwargs: Optional configuration parameters. Supported keys are:
+
+                * ``t_max``: Maximum integration time.
+                * ``n_timepoints``: Number of uniformly resampled trajectory points.
+                * ``eps``: Small numerical offset used to avoid singularities.
+                * ``v0_range``: Initial speed range.
+                * ``theta_range``: Launch polar angle range.
+                * ``phi_range``: Launch azimuth angle range.
+                * ``beta_D_range``: Drag coefficient range.
+                * ``beta_M_range``: Magnus coefficient range.
+                * ``u_mag_range``: Wind speed range.
+                * ``u_theta_range``: Wind polar angle range.
+                * ``u_phi_range``: Wind azimuth angle range.
+                * ``g``: Gravitational acceleration.
+                * ``omega``: Three-dimensional unit vector defining the spin axis.
+
+        Raises:
+            ValueError: If ``omega`` is not a three-dimensional vector.
+        """
         # initialize general parameters
         self.t_max: float = kwargs.get("t_max", 100.0)
         self.n_timepoints: int = kwargs.get("n_timepoints", 10000)
@@ -54,15 +92,40 @@ class TrajectoryGenerator:
         self._run_count: int = 0
         self._fail_count: int = 0
 
-    def __iter__(self):
+    def __iter__(self) -> TrajectoryGenerator:
+        """Return the generator itself.
+
+        Returns:
+            TrajectoryGenerator: The current generator instance.
+        """
         return self
 
-    def __next__(self):
+    def __next__(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Generate the next trajectory sample.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray, np.ndarray]:
+                A tuple containing the trajectory, launch parameters, and trajectory
+                characteristics.
+        """
         return self._generate_sample()
 
     def generate(
         self, n_samples: int, verbose: bool = False
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Generate multiple trajectory samples.
+
+        Args:
+            n_samples: Number of trajectories to generate.
+            verbose: If ``True``, display a progress bar during generation.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray, np.ndarray]: A tuple containing:
+                * trajectories of shape ``(n_samples, n_timepoints, 4)``,
+                * launch parameters of shape ``(n_samples, n_launch_params)``,
+                * trajectory characteristics of shape
+                    ``(n_samples, n_trajectory_characteristics)``.
+        """
         trajectories = np.empty((n_samples, self.n_timepoints, 4))
         launch_params = np.empty((n_samples, self.n_launch_params))
         traj_characs = np.empty((n_samples, self.n_trajectory_characteristics))
@@ -86,8 +149,16 @@ class TrajectoryGenerator:
 
     @property
     def fail_ratio(self) -> float:
+        """Fraction of attempted trajectory generations that failed.
+
+        Returns:
+            float: Ratio of failed trajectory generation attempts to total attempts.
+        """
         return self._fail_count / self._run_count
 
+    ####################################################################################
+    # Internal methods
+    ####################################################################################
     def _get_launch_parameters(self) -> np.ndarray:
         v0 = self.rng.uniform(*self.v0_range)
         theta = self.rng.uniform(*self.theta_range)
