@@ -1,0 +1,6 @@
+model_type: MLP
+
+input_dim: 4000
+output_dim: 8
+hidden_dim: [16000, 4000]
+num_hidden_layers: 2

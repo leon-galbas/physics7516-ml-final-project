@@ -124,6 +124,7 @@ def load_dataset(
     name: str, allow_pickle: bool = False
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     infile = get_dataset_filename(name)
+    logger.info(f"Loading dataset from '{infile}'...")
     data = np.load(infile, allow_pickle=allow_pickle)
     trajectories = data["trajectories"]
     launch_params = data["launch_parameters"]
