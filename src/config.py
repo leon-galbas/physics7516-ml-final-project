@@ -2,6 +2,7 @@
 DATA_DIR = "data"
 MODEL_DIR = "models"
 FIGURE_DIR = "figures"
+LOGS_DIR = "logs"
 
 # config files
 DATASET_CONFIG_DIR = "config/dataset"

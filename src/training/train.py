@@ -1,6 +1,8 @@
 import argparse
 import logging
+from datetime import datetime
 from os import path
+from pathlib import Path
 
 import torch
 import torch.nn as nn
@@ -9,6 +11,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
+from src.config import LOGS_DIR
 from src.data.io import load_dataset
 from src.models.io import (
     create_model,
@@ -133,9 +136,18 @@ def main(
 
 
 if __name__ == "__main__":
+    # logger setup
+    script_name = Path(__file__).stem
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    logfile = path.join(LOGS_DIR, f"{timestamp}_{script_name}.log")
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler(logfile),
+        ],
     )
 
     # Parse command line arguments
