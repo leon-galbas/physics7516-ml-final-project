@@ -4,19 +4,14 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
-import yaml
 
-from src.config import DATA_DIR, DATASET_CONFIG_DIR
+from src.config import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
 
 def get_dataset_filename(name: str) -> str:
     return os.path.join(DATA_DIR, f"{name}.npz")
-
-
-def get_config_filename(name: str) -> str:
-    return os.path.join(DATASET_CONFIG_DIR, f"{name}.yaml")
 
 
 def save_dataset(
@@ -131,18 +126,3 @@ def load_dataset(
     trajectory_characteristics = data["trajectory_characteristics"]
 
     return trajectories, launch_params, trajectory_characteristics
-
-
-def read_dataset_config(name: str) -> dict:
-    config_file = get_config_filename(name)
-    try:
-        logger.info(f"Reading dataset config from '{config_file}'.")
-        with open(config_file, "r") as file:
-            config = yaml.safe_load(file)
-        return config
-    except Exception as e:
-        logger.warning(
-            f"Reading the specified config failed with error: {e}. "
-            "Using default values instead."
-        )
-        return {}

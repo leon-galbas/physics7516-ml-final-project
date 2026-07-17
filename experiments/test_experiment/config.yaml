@@ -1,0 +1,28 @@
+model:
+  name: "MLP"
+  params:
+    input_dim: 4000
+    output_dim: 8
+    hidden_dim: [16000, 4000]
+    num_hidden_layers: 2
+
+loss:
+  name: "MSE"
+  params: {}
+
+optimizer:
+  name: "Adam"
+  params:
+    lr: 1e-3
+
+scheduler:
+  name: "ReduceLROnPlateau"
+  params:
+    mode: "min"
+    factor: 0.1
+    patience: 3
+
+training:
+  seed: 42
+  training_size: 0.2
+  batch_size: 256

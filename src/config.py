@@ -1,11 +1,7 @@
 # directories
-DATA_DIR = "data"
-MODEL_DIR = "models"
+DATA_DIR = "data/datasets"
 FIGURE_DIR = "figures"
 LOGS_DIR = "logs"
 
 # config files
-DATASET_CONFIG_DIR = "config/dataset"
-MODEL_CONFIG_DIR = "config/model"
-TRAINING_CONFIG_DIR = "config/training"
-DEFAULT_DATASET_CONFIG = "config/dataset/default.yaml"
+DATASET_CONFIG_DIR = "data/configs"

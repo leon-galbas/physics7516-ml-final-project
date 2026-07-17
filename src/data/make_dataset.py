@@ -8,9 +8,9 @@ from src.data.generator import TrajectoryGenerator
 from src.data.io import (
     append_dataset,
     get_dataset_filename,
-    read_dataset_config,
     save_dataset,
 )
+from src.utils import read_dataset_config
 
 logger = logging.getLogger(__name__)
 

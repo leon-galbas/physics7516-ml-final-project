@@ -6,60 +6,64 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
 from src.config import LOGS_DIR
 from src.data.io import load_dataset
-from src.models.io import (
-    create_model,
-    get_model_filename,
-    load_model,
-    read_model_config,
-    save_model,
+from src.training.io import (
+    create_checkpoint,
+    delete_checkpoints_after,
+    get_latest_checkpoint_number,
+    load_checkpoint,
+    save_checkpoint,
+    unpack_checkpoint,
 )
+from src.utils import get_nested, read_config
 
 logger = logging.getLogger(__name__)
 
 
+LOSS_FUNCS = {
+    "MSE": nn.MSELoss,
+    "MAE": nn.L1Loss,
+}
+
+
 def main(
-    model_name: str,
+    config_file: str,
     dataset_name: str,
-    epochs=10,
-    batch_size=256,
-    seed: int = 42,
-    force_retrain: bool = False,
-    continue_train: bool = False,
+    epochs: int,
+    check_freq: int,
+    start_checkpoint: int | None = None,
 ) -> None:
-    logger.info(
-        f"Running the training script for model '{model_name}' on dataset '{dataset_name}'."
+    directory = path.dirname(config_file)
+    config = read_config(config_file)
+
+    # load checkpoint
+    latest_checkpoint = get_latest_checkpoint_number(directory)
+    if start_checkpoint is None:
+        start_checkpoint = latest_checkpoint
+    else:
+        if start_checkpoint > latest_checkpoint:
+            raise ValueError(
+                "The 'start_checkpoint' is greater than the latest checkpoint "
+                f"({start_checkpoint} vs {latest_checkpoint})."
+            )
+    delete_checkpoints_after(directory, start_checkpoint)
+
+    # instantiate stuff
+    if start_checkpoint >= 0:
+        checkpoint = load_checkpoint(directory, index=start_checkpoint)
+    else:
+        checkpoint = {}
+    model, optimizer, scheduler, loss_history, start_epoch, index = unpack_checkpoint(
+        checkpoint, config
     )
 
-    # decide whether to modify the existing model or create a new one
-    if path.exists(get_model_filename(model_name)):
-        logger.info(f"The model '{model_name}' already exists.")
-        if force_retrain:
-            logger.warning(
-                f"Training is running with 'force_retrain'. The existing file '{get_model_filename(model_name)}' will be overwritten during training."
-            )
-            model = create_model(model_name)
-        elif continue_train:
-            logger.warning(
-                f"Training is running with 'continue_train'. The existing model '{get_model_filename(model_name)}' will be modified during training."
-            )
-            model = load_model(model_name)
-        else:
-            logger.info(
-                "Stopping training. Consider setting 'force_retrain' or 'continue_train' to modify the existing model."
-            )
-            return
-    else:
-        model = create_model(model_name)
-
-    # load dataset
-    X, Y, _ = load_dataset(dataset_name)
+    # load data
+    X, Y, Z = load_dataset(dataset_name)
     if not X.ndim == 3:
         raise ValueError(
             f"X must be of dimension (n_samples, n_timepoints, 4). Received {X.shape}."
@@ -69,9 +73,12 @@ def main(
             f"Y must be of dimension (n_samples, n_launch_params). Received {Y.shape}."
         )
 
-    # Train/test split
+    # train/test split
     X_train, X_test, y_train, y_test = train_test_split(
-        X, Y, test_size=0.2, random_state=seed
+        X,
+        Y,
+        test_size=get_nested(config, "training", "test_size", default=0.2),
+        random_state=get_nested(config, "training", "seed", default=42),
     )
 
     # convert to torch tensors
@@ -80,33 +87,29 @@ def main(
     y_train = torch.tensor(y_train, dtype=torch.float32)
     y_test = torch.tensor(y_test, dtype=torch.float32)
 
-    # load model config
-    model_config = read_model_config(model_name)
-    model_type = model_config["model_type"]
-
-    match model_type:
-        case "MLP":
-            X_train = torch.flatten(X_train, start_dim=1)
-            X_test = torch.flatten(X_test, start_dim=1)
-        case _:
-            raise ValueError(f"The model type '{model_type}' is not supported!")
-
-    # Loss and optimizer
-    criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
-
     # create batches
     training_data = TensorDataset(X_train, y_train)
     loader = DataLoader(
         training_data,
-        batch_size=batch_size,
+        batch_size=get_nested(config, "training", "batch_size", default=256),  # pyright: ignore[reportArgumentType]
         shuffle=True,
     )
 
-    # Training loop
-    logger.info("Starting training...")
-    for epoch in range(epochs):
-        logger.info(f"Start epoch {epoch + 1}/{epochs}...")
+    # set up loss function
+    loss_name = get_nested(config, "loss", "name")
+    if loss_name is None:
+        raise ValueError("No loss function specified in the training configuration!")
+    loss_params = get_nested(config, "loss", "params", default={})
+    loss_class = LOSS_FUNCS.get(loss_name)  # pyright: ignore[reportArgumentType]
+    criterion = loss_class(**loss_params)  # pyright: ignore[reportOptionalCall]
+
+    # run training loop
+    logger.info(
+        f"Starting training with loss function '{loss_name}' and optimizer '{optimizer}'..."
+    )
+    end_epoch = start_epoch + epochs
+    for epoch in range(start_epoch, end_epoch):
+        logger.info(f"Start epoch {epoch + 1}/{end_epoch}...")
 
         model.train()
         running_loss = 0.0
@@ -120,8 +123,16 @@ def main(
             running_loss += loss.item()
 
         avg_loss = running_loss / len(loader)
+        loss_history["train_loss"].append(avg_loss)
 
-        logger.info(f"Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.6f}")
+        logger.info(f"Epoch {epoch + 1}/{end_epoch}, Loss: {avg_loss:.6f}")
+
+        if epoch % check_freq == 0:
+            index += 1
+            checkpoint = create_checkpoint(
+                model, optimizer, scheduler, loss_history, epoch, index
+            )
+            save_checkpoint(checkpoint, directory)
 
     # Evaluation
     model.eval()
@@ -131,8 +142,6 @@ def main(
         test_loss = criterion(y_pred, y_test)
 
     logger.info(f"Validation loss: {test_loss.item():.6f}")
-
-    save_model(model, name=model_name)
 
 
 if __name__ == "__main__":
@@ -152,7 +161,7 @@ if __name__ == "__main__":
 
     # Parse command line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("model_name", help="Name of the model to be trained.")
+    parser.add_argument("config_file", help="Name of the training configuration.")
     parser.add_argument("dataset_name", help="Name of the training dataset.")
     parser.add_argument(
         "-e",
@@ -162,25 +171,31 @@ if __name__ == "__main__":
         help="Number of training epochs (default=10).",
     )
     parser.add_argument(
-        "-b",
-        "--batch-size",
+        "-f",
+        "--frequency-checkpoint",
         type=int,
-        default=256,
-        help="Batch size (default=256).",
+        default=5,
+        help="Number of epochs after which a checkpoint is saved (default=5).",
     )
     parser.add_argument(
         "-s",
-        "--seed",
+        "--start-checkpoint",
         type=int,
-        default=42,
-        help="Random seed for the training (default=42).",
+        help="Checkpoint index from which to continue training (default=latest_checkpoint).",
     )
     args = parser.parse_args()
 
     model_name = args.model_name
     dataset_name = args.dataset_name
+    config_name = args.config_name
     epochs = args.epochs
     batch_size = args.batch_size
     seed = args.seed
 
-    main(model_name, dataset_name, epochs=epochs, batch_size=batch_size, seed=seed)
+    main(
+        args.config_file,
+        args.dataset_name,
+        epochs=args.epochs,
+        check_freq=args.frequency_checkpoint,
+        start_checkpoint=args.start_checkpoint,
+    )
