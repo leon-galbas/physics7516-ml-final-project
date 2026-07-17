@@ -25,6 +25,9 @@ class MLP(nn.Module):
 
         layers = []
 
+        # Flatten data
+        layers.append(nn.Flatten())
+
         # Input layer
         layers.append(nn.Linear(input_dim, hidden_dim[0]))
         layers.append(nn.ReLU())
@@ -37,6 +40,7 @@ class MLP(nn.Module):
         # Output layer
         layers.append(nn.Linear(hidden_dim[-1], output_dim))
 
+        # Combine layers
         self.network = nn.Sequential(*layers)
 
     def forward(self, x):
