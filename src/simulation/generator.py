@@ -1,8 +1,14 @@
 import logging
+from os import path
+from typing import Mapping
 
 import numpy as np
 from scipy.integrate import OdeSolution, solve_ivp
 from tqdm import tqdm
+
+from src.config import SIM_REPO_DIR
+from src.data.repository import DataRepository
+from src.data.sample import RawSample
 
 logger = logging.getLogger(__name__)
 
@@ -16,20 +22,10 @@ class TrajectoryGenerator:
     trajectory characteristics.
 
     Instances are iterable and produce one trajectory sample per iteration.
-
-    Attributes:
-        n_launch_params: Number of sampled launch and environment parameters.
-        n_trajectory_characteristics: Number of computed trajectory summary
-            characteristics.
     """
-
-    # constant class variables
-    n_launch_params: int = 8
-    n_trajectory_characteristics: int = 8
 
     def __init__(
         self,
-        seed: int = 42,
         **kwargs,
     ) -> None:
         """Initialize the trajectory generator.
@@ -38,6 +34,7 @@ class TrajectoryGenerator:
             seed: Seed used to initialize the random number generator.
             **kwargs: Optional configuration parameters. Supported keys are:
 
+                * ``seed``: Random seed for data generation.
                 * ``t_max``: Maximum integration time.
                 * ``n_timepoints``: Number of uniformly resampled trajectory points.
                 * ``eps``: Small numerical offset used to avoid singularities.
@@ -50,21 +47,16 @@ class TrajectoryGenerator:
                 * ``u_theta_range``: Wind polar angle range.
                 * ``u_phi_range``: Wind azimuth angle range.
                 * ``g``: Gravitational acceleration.
-                * ``omega``: Three-dimensional unit vector defining the spin axis.
-                * ``noise_coeffs``: Three-dimensional unit vector containing coefficients
-                    for calculating the noise in each dimension.
-                * ``noise_type``: Type of noise. Allowed values are
-                    'gauss', 'random-walk', 'none' (default)
 
         Raises:
             ValueError: If ``omega`` is not a three-dimensional vector.
         """
         # initialize general parameters
         self.t_max: float = kwargs.get("t_max", 100.0)
-        self.n_timepoints: int = kwargs.get("n_timepoints", 10000)
+        self.n_timepoints: int = kwargs.get("n_timepoints", 1000)
         self.eps: float = kwargs.get("eps", 1e-6)
 
-        # initialize launch parameters
+        # initialize launch parameter ranges
         self.v0_range: tuple[float, float] = kwargs.get("v0_range", (0.0, 75.0))
         self.theta_range: tuple[float, float] = kwargs.get(
             "theta_range", (0.0, np.pi / 2 - self.eps)
@@ -84,20 +76,10 @@ class TrajectoryGenerator:
             "u_phi_range", (0.0, 2 * np.pi - self.eps)
         )
         self.g: float = kwargs.get("g", 9.81)
-        omega: list[float] = kwargs.get("omega", [1.0, 1.0, 1.0])
-        if len(omega) != 3:
-            raise ValueError("Omega must be a 3D vector!")
-        self.omega: np.ndarray = np.array(omega) / np.linalg.norm(omega)
-        noise_coeffs: list[float] = kwargs.get("noise_coeffs", [0.01, 0.01, 0.01])
-        if len(noise_coeffs) != 3:
-            raise ValueError("Noise coefficients must be a 3D vector!")
-        self.noise_coeffs: np.ndarray = np.array(noise_coeffs)
-        self.noise_type: str = kwargs.get("noise_type", "none")
-        if self.noise_type not in ["gauss", "random-walk", "none"]:
-            raise ValueError(f"The noise type {self.noise_type} is not implemented!")
 
         # initialize random number generator
-        self.rng: np.random.Generator = np.random.default_rng(seed=seed)
+        self.seed: int = kwargs.get("seed", 42)
+        self.rng: np.random.Generator = np.random.default_rng(seed=self.seed)
 
         # Track how many generations yielded trajectories that did not reach the ground
         self._run_count: int = 0
@@ -111,7 +93,7 @@ class TrajectoryGenerator:
         """
         return self
 
-    def __next__(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def __next__(self) -> RawSample:
         """Generate the next trajectory sample.
 
         Returns:
@@ -121,9 +103,7 @@ class TrajectoryGenerator:
         """
         return self._generate_sample()
 
-    def generate(
-        self, n_samples: int, verbose: bool = False
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def generate(self, n_samples: int, verbose: bool = False) -> list[RawSample] | None:
         """Generate multiple trajectory samples.
 
         Args:
@@ -137,26 +117,85 @@ class TrajectoryGenerator:
                 * trajectory characteristics of shape
                     ``(n_samples, n_trajectory_characteristics)``.
         """
-        trajectories = np.empty((n_samples, self.n_timepoints, 4))
-        launch_params = np.empty((n_samples, self.n_launch_params))
-        traj_characs = np.empty((n_samples, self.n_trajectory_characteristics))
-
         logger.info(
-            f"Generating {n_samples} trajectories with {self.n_timepoints} timepoints each."
+            f"Generating {n_samples} trajectories with "
+            f"{self.n_timepoints} timepoints each."
         )
-
+        samples = []
         iterator = range(n_samples)
         if verbose:
             iterator = tqdm(iterator)
         for i in iterator:
-            traj, params, characs = next(self)
-            trajectories[i] = traj
-            launch_params[i] = params
-            traj_characs[i] = characs
+            sample = next(self)
+            samples.append(sample)
 
         logger.info(f"Done! Fail ratio: {self.fail_ratio:.4f}")
 
-        return trajectories, launch_params, traj_characs
+        return samples
+
+    def generate_to_repo(
+        self, repo_name: str, n_samples: int, verbose: bool = False
+    ) -> list[RawSample] | None:
+        """Generate multiple trajectory samples.
+
+        Args:
+            n_samples: Number of trajectories to generate.
+            verbose: If ``True``, display a progress bar during generation.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray, np.ndarray]: A tuple containing:
+                * trajectories of shape ``(n_samples, n_timepoints, 4)``,
+                * launch parameters of shape ``(n_samples, n_launch_params)``,
+                * trajectory characteristics of shape
+                    ``(n_samples, n_trajectory_characteristics)``.
+        """
+        repository: str = path.join(SIM_REPO_DIR, f"{repo_name}.h5")
+
+        if not path.exists(repository):
+            logger.info(
+                f"The repository '{repository}' does not exists. Creating new repo."
+            )
+            with DataRepository(repository, "a") as repo:
+                pass
+        else:
+            with DataRepository(repository, "r") as repo:
+                repo_len = len(repo)
+                if repo_len >= n_samples:
+                    logger.info(
+                        f"The repository '{repository}' already contains {repo_len} >= {n_samples} samples. Skipping generation..."
+                    )
+                    return
+                elif repo_len > 0 and repo_len < n_samples:
+                    logger.info(
+                        f"The repository '{repository}' already contains {repo_len} < {n_samples} samples. Generating the remaining {n_samples - repo_len} samples..."
+                    )
+                    n_samples = n_samples - repo_len
+                    last_sample = repo[-1]
+                    rand_state = last_sample.metadata.get("rng_state")  # pyright: ignore[reportAttributeAccessIssue]
+                    if rand_state is not None:
+                        self.random_state = rand_state
+                    else:
+                        raise ValueError(
+                            "Could not infer the random state from the latest sample in the repository!"
+                        )
+                else:
+                    logger.info(
+                        f"The repository '{repository}' is empty. Generating {n_samples} samples..."
+                    )
+
+        logger.info(
+            f"Generating {n_samples} trajectories with "
+            f"{self.n_timepoints} timepoints each."
+        )
+        iterator = range(n_samples)
+        if verbose:
+            iterator = tqdm(iterator)
+        for i in iterator:
+            sample = next(self)
+            with DataRepository(repository, "a") as repo:
+                repo.append(sample)
+
+        logger.info(f"Done! Fail ratio: {self.fail_ratio:.4f}")
 
     @property
     def fail_ratio(self) -> float:
@@ -167,39 +206,76 @@ class TrajectoryGenerator:
         """
         return self._fail_count / self._run_count
 
+    @property
+    def random_state(self) -> Mapping:
+        return self.rng.bit_generator.state
+
+    @random_state.setter
+    def random_state(self, state: Mapping) -> None:
+        self.rng.bit_generator.state = state
+
     ####################################################################################
     # Internal methods
     ####################################################################################
-    def _get_launch_parameters(self) -> np.ndarray:
+    def _get_launch_parameters(self) -> dict[str, float]:
         v0 = self.rng.uniform(*self.v0_range)
-        theta = self.rng.uniform(*self.theta_range)
+        theta = np.arccos(
+            self.rng.uniform(np.cos(self.theta_range[1]), np.cos(self.theta_range[0]))
+        )
         phi = self.rng.uniform(*self.phi_range)
         beta_D = self.rng.uniform(*self.beta_D_range)
         beta_M = self.rng.uniform(*self.beta_M_range)
         u_mag = self.rng.uniform(*self.u_mag_range)
-        u_theta = self.rng.uniform(*self.u_theta_range)
+        u_theta = np.arccos(
+            self.rng.uniform(
+                np.cos(self.u_theta_range[1]), np.cos(self.u_theta_range[0])
+            )
+        )
         u_phi = self.rng.uniform(*self.u_phi_range)
+        omega = self.rng.normal(size=3)
+        omega /= np.linalg.norm(omega)
 
-        return np.array([v0, theta, phi, beta_D, beta_M, u_mag, u_theta, u_phi])
-
-    def _compute_trajectory(self, launch_parameters: np.ndarray) -> OdeSolution:
-        v0, theta, phi, beta_D, beta_M, u_mag, u_theta, u_phi = launch_parameters
-
-        # Wind vector
+        # convert to cartesian
         ux = u_mag * np.sin(u_theta) * np.cos(u_phi)
         uy = u_mag * np.sin(u_theta) * np.sin(u_phi)
         uz = u_mag * np.cos(u_theta)
+        omega_x, omega_y, omega_z = omega
+
+        return {
+            "v0": v0,
+            "theta": theta,
+            "phi": phi,
+            "ux": ux,
+            "uy": uy,
+            "uz": uz,
+            "omega_x": omega_x,
+            "omega_y": omega_y,
+            "omega_z": omega_y,
+            "beta_D": beta_D,
+            "beta_M": beta_M,
+        }
+
+    def _compute_trajectory(self, launch_parameters: dict[str, float]) -> OdeSolution:
+        # fetch launch parameters from dictionary
+        v0, theta, phi = (launch_parameters[k] for k in ["v0", "theta", "phi"])
+        ux, uy, uz = (launch_parameters[k] for k in ["ux", "uy", "uz"])
+        omega_x, omega_y, omega_z = (
+            launch_parameters[k] for k in ["omega_x", "omega_y", "omega_z"]
+        )
+        beta_D, beta_M = (launch_parameters[k] for k in ["beta_D", "beta_M"])
+
+        # wind vector
         wind = np.array([ux, uy, uz], dtype=float)
 
-        # Fixed spin axis. NOTE: Maybe make this a parameter later
-        spin_axis = self.omega
+        # spin axis.
+        spin_axis = np.array([omega_x, omega_y, omega_z], dtype=float)
 
-        # Initial position
+        # initial position
         x0 = 0.0
         y0 = 0.0
         z0 = self.eps  # avoids immediate ground event at t=0
 
-        # Initial velocity from spherical coordinates
+        # initial velocity from spherical coordinates
         vx0 = v0 * np.sin(theta) * np.cos(phi)
         vy0 = v0 * np.sin(theta) * np.sin(phi)
         vz0 = v0 * np.cos(theta)
@@ -253,9 +329,7 @@ class TrajectoryGenerator:
 
         return sol
 
-    def _resample_and_compute_characteristics(
-        self, sol: OdeSolution
-    ) -> tuple[np.ndarray, np.ndarray]:
+    def _resample(self, sol: OdeSolution) -> tuple[np.ndarray, np.ndarray]:
         # Reject trajectories that did not hit the ground
         if len(sol.t_events[0]) == 0 or sol.status != 1:  # pyright: ignore[reportAttributeAccessIssue]
             raise RuntimeError("Trajectory did not hit the ground within t_max.")
@@ -268,44 +342,33 @@ class TrajectoryGenerator:
         x = states[:, 0]
         y = states[:, 1]
         z = states[:, 2]
-        trajectory = np.stack([t_eval, x, y, z], axis=1)
+        positions = np.stack([x, y, z], axis=1)
 
-        # Compute characteristics
-        x_absmax, y_absmax, z_absmax = np.max(np.abs(trajectory), axis=0)[1:]
-        x_hit, y_hit = trajectory[-1, 1:3]
-        traj_dist = np.linalg.norm(np.array([x_hit, y_hit]))
-        traj_length = np.sum(np.linalg.norm(np.diff(trajectory[:, 1:], axis=0), axis=1))
-        characteristics = np.array(
-            [t_hit, x_hit, y_hit, x_absmax, y_absmax, z_absmax, traj_dist, traj_length]
-        )
+        return t_eval, positions
 
-        return trajectory, characteristics
+    # def _add_noise(self, trajectory: np.ndarray) -> np.ndarray:
+    #     match self.noise_type:
+    #         case "gauss":
+    #             noise = self.rng.normal(
+    #                 0.0, self.noise_coeffs, size=trajectory[:, 1:].shape
+    #             )
+    #             trajectory[:, 1:] += noise
+    #         case "random-walk":
+    #             increments = self.rng.normal(
+    #                 0.0, self.noise_coeffs, size=trajectory[:, 1:].shape
+    #             )
+    #             drift = np.cumsum(increments, axis=0)
+    #             trajectory[:, 1:] += drift
+    #         case "none":
+    #             pass
+    #         case _:
+    #             raise ValueError(
+    #                 f"The noise type '{self.noise_type}' is not implemented!"
+    #             )
 
-    def _add_noise(self, trajectory: np.ndarray) -> np.ndarray:
-        match self.noise_type:
-            case "gauss":
-                noise = self.rng.normal(
-                    0.0, self.noise_coeffs, size=trajectory[:, 1:].shape
-                )
-                trajectory[:, 1:] += noise
-            case "random-walk":
-                increments = self.rng.normal(
-                    0.0, self.noise_coeffs, size=trajectory[:, 1:].shape
-                )
-                drift = np.cumsum(increments, axis=0)
-                trajectory[:, 1:] += drift
-            case "none":
-                pass
-            case _:
-                raise ValueError(
-                    f"The noise type '{self.noise_type}' is not implemented!"
-                )
+    #     return trajectory
 
-        return trajectory
-
-    def _generate_sample(
-        self, max_tries: int = 100, return_raw: bool = False
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _generate_sample(self, max_tries: int = 100) -> RawSample:
         success = False
         try_count = 0
 
@@ -318,13 +381,15 @@ class TrajectoryGenerator:
                 self._run_count += 1
                 try_count += 1
                 launch_params = self._get_launch_parameters()
-                raw_trajectory = self._compute_trajectory(launch_params)
-                trajectory, characteristics = (
-                    self._resample_and_compute_characteristics(raw_trajectory)
-                )
-                trajectory = self._add_noise(trajectory)
+                trajectory_sol = self._compute_trajectory(launch_params)
+                t, pos = self._resample(trajectory_sol)
+                metadata = {
+                    "seed": self.seed,
+                    "rng_state": self.rng.bit_generator.state,
+                }
+                sample = RawSample(t, pos, launch_params, metadata)
                 success = True
             except Exception:
                 self._fail_count += 1
 
-        return trajectory, launch_params, characteristics
+        return sample

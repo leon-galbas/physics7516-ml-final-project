@@ -1,4 +1,0 @@
-n_samples: 1000
-n_timepoints: 100
-noise_type: random-walk
-noise_coeffs: [.1, .1, .1]
