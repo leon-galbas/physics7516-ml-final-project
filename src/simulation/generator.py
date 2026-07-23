@@ -346,28 +346,6 @@ class TrajectoryGenerator:
 
         return t_eval, positions
 
-    # def _add_noise(self, trajectory: np.ndarray) -> np.ndarray:
-    #     match self.noise_type:
-    #         case "gauss":
-    #             noise = self.rng.normal(
-    #                 0.0, self.noise_coeffs, size=trajectory[:, 1:].shape
-    #             )
-    #             trajectory[:, 1:] += noise
-    #         case "random-walk":
-    #             increments = self.rng.normal(
-    #                 0.0, self.noise_coeffs, size=trajectory[:, 1:].shape
-    #             )
-    #             drift = np.cumsum(increments, axis=0)
-    #             trajectory[:, 1:] += drift
-    #         case "none":
-    #             pass
-    #         case _:
-    #             raise ValueError(
-    #                 f"The noise type '{self.noise_type}' is not implemented!"
-    #             )
-
-    #     return trajectory
-
     def _generate_sample(self, max_tries: int = 100) -> RawSample:
         success = False
         try_count = 0
