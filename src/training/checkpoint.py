@@ -90,6 +90,7 @@ def save_checkpoint(checkpoint: dict, directory: str, name: str | None = None) -
         filename = path.join(directory, f"{name}.pt")
     else:
         filename = path.join(directory, f"checkpoint_{checkpoint['index']:04}.pt")
+    logger.info(f"Saving checkpoint '{filename}'...")
     torch.save(checkpoint, filename)
 
 
@@ -103,6 +104,7 @@ def load_checkpoint(
     else:
         filename = path.join(directory, f"checkpoint_{index:04}.pt")
 
+    logger.info(f"Loading checkpoint '{filename}'...")
     checkpoint = torch.load(filename)
 
     return checkpoint

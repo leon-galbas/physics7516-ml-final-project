@@ -6,13 +6,13 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
 from src.config import LOGS_DIR
-from src.data.io import load_dataset
-from src.training.io import (
+from src.data.dataset_builder import DatasetBuilder
+from src.simulation.generator import TrajectoryGenerator
+from src.training.checkpoint import (
     create_checkpoint,
     delete_checkpoints_after,
     get_latest_checkpoint_number,
@@ -33,13 +33,68 @@ LOSS_FUNCS = {
 
 def main(
     config_file: str,
-    dataset_name: str,
     epochs: int,
     check_freq: int,
     start_checkpoint: int | None = None,
 ) -> None:
+    logger.info(f"Starting the experiment specified in '{config_file}'.")
     directory = path.dirname(config_file)
     config = read_config(config_file)
+
+    # generate trajectories
+    sim_config = config["simulation"]
+    n_samples = sim_config["n_samples"]
+    generator = TrajectoryGenerator(**sim_config)
+    generator.generate_to_repo(sim_config["repo_name"], n_samples, verbose=True)
+
+    # load data
+    features_path = path.join(directory, "X.pt")
+    targets_path = path.join(directory, "Y.pt")
+    if path.exists(features_path) and path.exists(targets_path):
+        logger.info("The processed dataset already exists. Loading data...")
+        X = torch.load(features_path)
+        logger.info(f"Loaded feature dataset of shape {X.shape}.")
+        Y = torch.load(targets_path)
+        logger.info(f"Loaded target dataset of shape {Y.shape}.")
+    else:
+        repo_name = get_nested(config, "simulation", "repo_name")
+        builder = DatasetBuilder(repo_name, config["data"])  # pyright: ignore[reportArgumentType]
+        X, Y = builder.build_dataset(n_samples, verbose=True)
+        torch.save(X, features_path)
+        torch.save(Y, targets_path)
+    if X.size(0) != Y.size(0):
+        raise ValueError(
+            f"The number of samples in X and Y do not match ({X.size(0)} vs {Y.size(0)})."
+        )
+
+    # train/test split
+    test_size = get_nested(config, "training", "test_size", default=0.2)
+    seed = get_nested(config, "training", "seed", default=42)
+    n = X.size(0)
+    perm = torch.randperm(n, generator=torch.Generator().manual_seed(seed))  # pyright: ignore[reportArgumentType]
+
+    test_n = int(test_size * n)  # pyright: ignore[reportOperatorIssue]
+    test_idx = perm[:test_n]
+    train_idx = perm[test_n:]
+
+    X_train = X[train_idx]
+    X_test = X[test_idx]
+    Y_train = Y[train_idx]
+    Y_test = Y[test_idx]
+
+    # create batches
+    training_data = TensorDataset(X_train, Y_train)
+    test_data = TensorDataset(X_test, Y_test)
+    train_loader = DataLoader(
+        training_data,
+        batch_size=get_nested(config, "training", "batch_size", default=256),  # pyright: ignore[reportArgumentType]
+        shuffle=True,
+    )
+    test_loader = DataLoader(
+        test_data,
+        batch_size=get_nested(config, "training", "batch_size", default=256),  # pyright: ignore[reportArgumentType]
+        shuffle=False,
+    )
 
     # load checkpoint
     latest_checkpoint = get_latest_checkpoint_number(directory)
@@ -62,39 +117,6 @@ def main(
         checkpoint, config
     )
 
-    # load data
-    X, Y, Z = load_dataset(dataset_name)
-    if not X.ndim == 3:
-        raise ValueError(
-            f"X must be of dimension (n_samples, n_timepoints, 4). Received {X.shape}."
-        )
-    if not Y.ndim == 2:
-        raise ValueError(
-            f"Y must be of dimension (n_samples, n_launch_params). Received {Y.shape}."
-        )
-
-    # train/test split
-    X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        Y,
-        test_size=get_nested(config, "training", "test_size", default=0.2),
-        random_state=get_nested(config, "training", "seed", default=42),
-    )
-
-    # convert to torch tensors
-    X_train = torch.tensor(X_train, dtype=torch.float32)
-    X_test = torch.tensor(X_test, dtype=torch.float32)
-    y_train = torch.tensor(y_train, dtype=torch.float32)
-    y_test = torch.tensor(y_test, dtype=torch.float32)
-
-    # create batches
-    training_data = TensorDataset(X_train, y_train)
-    loader = DataLoader(
-        training_data,
-        batch_size=get_nested(config, "training", "batch_size", default=256),  # pyright: ignore[reportArgumentType]
-        shuffle=True,
-    )
-
     # set up loss function
     loss_name = get_nested(config, "loss", "name")
     if loss_name is None:
@@ -111,21 +133,33 @@ def main(
     for epoch in range(start_epoch, end_epoch):
         logger.info(f"Start epoch {epoch + 1}/{end_epoch}...")
 
+        # Run training
         model.train()
         running_loss = 0.0
-
-        for X_batch, Y_batch in tqdm(loader):
+        for X_batch, Y_batch in tqdm(train_loader):
             optimizer.zero_grad()
             prediction = model(X_batch)
             loss = criterion(prediction, Y_batch)
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
+        train_loss = running_loss / len(train_loader)
+        loss_history["train_loss"].append(train_loss)
 
-        avg_loss = running_loss / len(loader)
-        loss_history["train_loss"].append(avg_loss)
+        # compute validation loss
+        model.eval()
+        running_loss = 0.0
+        with torch.no_grad():
+            for X_batch, Y_batch in tqdm(test_loader):
+                prediction = model(X_batch)
+                loss = criterion(prediction, Y_batch)
+                running_loss += loss.item()
+        test_loss = running_loss / len(test_loader)
+        loss_history["test_loss"].append(test_loss)
 
-        logger.info(f"Epoch {epoch + 1}/{end_epoch}, Loss: {avg_loss:.6f}")
+        logger.info(
+            f"Epoch {epoch + 1}/{end_epoch}, Train Loss: {train_loss:.6f}, Test Loss: {test_loss:.6f}"
+        )
 
         if epoch % check_freq == 0:
             index += 1
@@ -133,15 +167,6 @@ def main(
                 model, optimizer, scheduler, loss_history, epoch, index
             )
             save_checkpoint(checkpoint, directory)
-
-    # Evaluation
-    model.eval()
-
-    with torch.no_grad():
-        y_pred = model(X_test)
-        test_loss = criterion(y_pred, y_test)
-
-    logger.info(f"Validation loss: {test_loss.item():.6f}")
 
 
 if __name__ == "__main__":
@@ -162,7 +187,6 @@ if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("config_file", help="Name of the training configuration.")
-    parser.add_argument("dataset_name", help="Name of the training dataset.")
     parser.add_argument(
         "-e",
         "--epochs",
@@ -185,16 +209,8 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    model_name = args.model_name
-    dataset_name = args.dataset_name
-    config_name = args.config_name
-    epochs = args.epochs
-    batch_size = args.batch_size
-    seed = args.seed
-
     main(
         args.config_file,
-        args.dataset_name,
         epochs=args.epochs,
         check_freq=args.frequency_checkpoint,
         start_checkpoint=args.start_checkpoint,

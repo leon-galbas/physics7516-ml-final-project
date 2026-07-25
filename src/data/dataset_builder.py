@@ -26,9 +26,9 @@ class Pipeline:
     def __init__(self, transform_config: dict) -> None:
         # read transformations from config and initialize transformation classes
         self.transforms = []
-        for tf in transform_config:
-            name = list(tf.keys())[0]
-            kwargs = tf[name]
+        for transf in transform_config:
+            name = list(transf.keys())[0]
+            kwargs = transf[name]
             cls = TRANSFORMS[name]
             transform = cls(**kwargs)
             self.transforms.append(transform)
@@ -65,16 +65,20 @@ class DatasetBuilder:
         n_targets = len(self.targets)
 
         # Initialize the feature and target tensors
-        ts_features = torch.empty(n_samples, n_ts_features, self.n_timepoints)
+        ts_features = torch.empty(
+            n_samples, n_ts_features, self.n_timepoints, dtype=torch.float32
+        )
         logger.info(f"Initialized feature tensor of shape {ts_features.shape}.")
-        targets = torch.empty(n_samples, n_targets)
+        targets = torch.empty(n_samples, n_targets, dtype=torch.float32)
         logger.info(f"Initialized target tensor of shape {targets.shape}.")
 
         # fetch raw samples
+        logger.info(f"Loading raw samples from '{self.repo}'.")
         with DataRepository(self.repo, "r") as repo:
             raw_samples = repo[:n_samples]
 
         # process raw samples
+        logger.info("Processing raw samples...")
         iterator = enumerate(raw_samples)  # pyright: ignore[reportArgumentType]
         if verbose:
             iterator = tqdm(iterator)
@@ -86,5 +90,6 @@ class DatasetBuilder:
                 )
             for j, target in enumerate(self.targets):
                 targets[i, j] = torch.from_numpy(processed_sample.targets[target])
+        logger.info("Done!")
 
         return ts_features, targets
