@@ -5,6 +5,7 @@ simulation:
   seed: 42
 
 data:
+  n_timepoints: 500
   transforms:
     - TimeSlice:
         t_min: 0
@@ -12,14 +13,14 @@ data:
     - Resample:
         n_timepoints: 500
         distribution: "even"
-    - Gaussian:
+    - GaussianNoise:
         std: 0.1
   ts_features:
     - t
     - x
     - y
     - z
-  scalar_features: []
+  # scalar_features: []
   targets:
     - v0
     - theta

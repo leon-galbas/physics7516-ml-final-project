@@ -1,11 +1,15 @@
+import logging
 from os import path
 
 import torch
+from tqdm import tqdm
 
 import src.data.transforms as tf
 from src.config import SIM_REPO_DIR
 from src.data.repository import DataRepository
 from src.data.sample import ProcessedSample, RawSample
+
+logger = logging.getLogger(__name__)
 
 TRANSFORMS = {
     # initial slicing
@@ -50,14 +54,37 @@ class DatasetBuilder:
         # read config
         self.pipeline = Pipeline(data_config["transforms"])
         self.ts_features = data_config["ts_features"]
-        self.scalar_features = data_config["scalar_features"]
         self.targets = data_config["targets"]
+        self.n_timepoints = data_config["n_timepoints"]
 
-    def build_dataset(self, n_samples: int) -> tuple[torch.Tensor, torch.Tensor]:
-        processed_samples = []
+    def build_dataset(
+        self, n_samples: int, verbose: bool = False
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        logger.info(f"Building dataset of {n_samples} samples...")
+        n_ts_features = len(self.ts_features)
+        n_targets = len(self.targets)
 
+        # Initialize the feature and target tensors
+        ts_features = torch.empty(n_samples, n_ts_features, self.n_timepoints)
+        logger.info(f"Initialized feature tensor of shape {ts_features.shape}.")
+        targets = torch.empty(n_samples, n_targets)
+        logger.info(f"Initialized target tensor of shape {targets.shape}.")
+
+        # fetch raw samples
         with DataRepository(self.repo, "r") as repo:
             raw_samples = repo[:n_samples]
 
-        for sample in raw_samples:
-            processed_samples.append(self.pipeline(sample))
+        # process raw samples
+        iterator = enumerate(raw_samples)  # pyright: ignore[reportArgumentType]
+        if verbose:
+            iterator = tqdm(iterator)
+        for i, sample in iterator:
+            processed_sample = self.pipeline(sample)
+            for j, feature in enumerate(self.ts_features):
+                ts_features[i, j, :] = torch.from_numpy(
+                    processed_sample.trajectory[feature]
+                )
+            for j, target in enumerate(self.targets):
+                targets[i, j] = torch.from_numpy(processed_sample.targets[target])
+
+        return ts_features, targets
