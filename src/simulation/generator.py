@@ -250,7 +250,7 @@ class TrajectoryGenerator:
             "uz": uz,
             "omega_x": omega_x,
             "omega_y": omega_y,
-            "omega_z": omega_y,
+            "omega_z": omega_z,
             "beta_D": beta_D,
             "beta_M": beta_M,
         }

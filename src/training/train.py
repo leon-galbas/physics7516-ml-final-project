@@ -94,6 +94,35 @@ def main(
     Y_train = Y[train_idx]
     Y_test = Y[test_idx]
 
+    # scale data
+    feature_type = get_nested(config, "data", "feature_type")
+    feature_scaling = get_nested(config, "data", "feature_scaling")
+    target_scaling = get_nested(config, "data", "target_scaling")
+    if feature_scaling:
+        if feature_type == "timeseries":
+            eps = 1e-8
+            means = X_train.mean(dim=(0, 2), keepdim=True)
+            stds = X_train.std(dim=(0, 2), keepdim=True)
+            X_train = (X_train - means) / (stds + eps)
+            X_test = (X_test - means) / (stds + eps)
+        elif feature_type == "scalar":
+            eps = 1e-8
+            means = X_train.mean(dim=0, keepdim=True)
+            stds = X_train.std(dim=0, keepdim=True)
+            X_train = (X_train - means) / (stds + eps)
+            X_test = (X_test - means) / (stds + eps)
+        else:
+            raise ValueError(
+                "Feature type in data config must be either 'timeseries' or 'scalar', "
+                f"got '{feature_type}'."
+            )
+    if target_scaling:
+        eps = 1e-8
+        means = Y_train.mean(dim=0, keepdim=True)
+        stds = Y_train.std(dim=0, keepdim=True)
+        Y_train = (Y_train - means) / (stds + eps)
+        Y_test = (Y_test - means) / (stds + eps)
+
     # create batches
     training_data = TensorDataset(X_train, Y_train)
     test_data = TensorDataset(X_test, Y_test)

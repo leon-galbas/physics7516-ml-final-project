@@ -19,6 +19,13 @@ TRANSFORMS = {
     # time series noise
     "GaussianNoise": tf.GaussianNoise,
     "RandomWalkNoise": tf.RandomWalkNoise,
+    # features
+    "ComputeVelocities": tf.ComputeVelocities,
+    "ComputeAccelerations": tf.ComputeAccelerations,
+    "ComputeScalarFeatures": tf.ComputeScalarFeatures,
+    # targets
+    "ComputeHitpoint": tf.ComputeHitpoint,
+    "ComputeEuclideanVelocity": tf.ComputeEuclideanVelocity,
 }
 
 
@@ -27,11 +34,21 @@ class Pipeline:
         # read transformations from config and initialize transformation classes
         self.transforms = []
         for transf in transform_config:
-            name = list(transf.keys())[0]
-            kwargs = transf[name]
-            cls = TRANSFORMS[name]
-            transform = cls(**kwargs)
-            self.transforms.append(transform)
+            if isinstance(transf, str):
+                cls = TRANSFORMS[transf]
+                transform = cls()
+                self.transforms.append(transform)
+            elif isinstance(transf, dict):
+                name = list(transf.keys())[0]
+                kwargs = transf[name]
+                cls = TRANSFORMS[name]
+                transform = cls(**kwargs)
+                self.transforms.append(transform)
+            else:
+                raise TypeError(
+                    "Transform specified in config must be of type 'str' or 'dict', "
+                    f"got '{type(transf)}'."
+                )
 
     def __call__(
         self, sample: RawSample, include_metadata: bool = False
@@ -89,18 +106,15 @@ class DatasetBuilder:
         targets = torch.empty(n_samples, n_targets, dtype=torch.float32)
         logger.info(f"Initialized target tensor of shape {targets.shape}.")
 
-        # fetch raw samples
-        logger.info(f"Loading raw samples from '{self.repo}'.")
-        with DataRepository(self.repo, "r") as repo:
-            raw_samples = repo[:n_samples]
-
         # process raw samples
-        logger.info("Processing raw samples...")
-        iterator = enumerate(raw_samples)  # pyright: ignore[reportArgumentType]
+        logger.info(f"Processing raw samples from '{self.repo}'...")
+        iterator = range(n_samples)
         if verbose:
-            iterator = tqdm(iterator, total=len(raw_samples), desc="Processing")  # pyright: ignore[reportArgumentType]
-        for i, sample in iterator:
-            processed_sample = self.pipeline(sample)
+            iterator = tqdm(iterator, total=n_samples, desc="Processing")  # pyright: ignore[reportArgumentType]
+        for i in iterator:
+            with DataRepository(self.repo, "r") as repo:
+                raw_sample = repo[i]
+            processed_sample = self.pipeline(raw_sample)  # pyright: ignore[reportArgumentType]
             for j, feature in enumerate(self.features):
                 if self.feature_type == "timeseries":
                     features[i, j, :] = torch.from_numpy(
