@@ -52,23 +52,40 @@ class DatasetBuilder:
         self.repo: str = path.join(SIM_REPO_DIR, f"{repo_name}.h5")
 
         # read config
+        self.n_timepoints = data_config.get("n_timepoints")
+        self.feature_type = data_config.get("feature_type")
+        if self.feature_type not in ["timeseries", "scalar"]:
+            raise ValueError(
+                "Feature type must be either 'timeseries' or 'scalar', "
+                f"got '{self.feature_type}'."
+            )
+        if self.feature_type == "timeseries" and self.n_timepoints is None:
+            raise ValueError(
+                "If feature_type 'timeseries' is set, must provide 'n_timepoints' "
+                "value in the data config."
+            )
         self.pipeline = Pipeline(data_config["transforms"])
-        self.ts_features = data_config["ts_features"]
+        self.features = data_config["features"]
         self.targets = data_config["targets"]
-        self.n_timepoints = data_config["n_timepoints"]
 
     def build_dataset(
         self, n_samples: int, verbose: bool = False
     ) -> tuple[torch.Tensor, torch.Tensor]:
         logger.info(f"Building dataset of {n_samples} samples...")
-        n_ts_features = len(self.ts_features)
+        n_features = len(self.features)
         n_targets = len(self.targets)
 
         # Initialize the feature and target tensors
-        ts_features = torch.empty(
-            n_samples, n_ts_features, self.n_timepoints, dtype=torch.float32
-        )
-        logger.info(f"Initialized feature tensor of shape {ts_features.shape}.")
+        if self.feature_type == "timeseries":
+            features = torch.empty(
+                n_samples,
+                n_features,
+                self.n_timepoints,  # pyright: ignore[reportArgumentType]
+                dtype=torch.float32,
+            )
+        else:
+            features = torch.empty(n_samples, n_features, dtype=torch.float32)
+        logger.info(f"Initialized feature tensor of shape {features.shape}.")
         targets = torch.empty(n_samples, n_targets, dtype=torch.float32)
         logger.info(f"Initialized target tensor of shape {targets.shape}.")
 
@@ -84,12 +101,15 @@ class DatasetBuilder:
             iterator = tqdm(iterator, total=len(raw_samples), desc="Processing")  # pyright: ignore[reportArgumentType]
         for i, sample in iterator:
             processed_sample = self.pipeline(sample)
-            for j, feature in enumerate(self.ts_features):
-                ts_features[i, j, :] = torch.from_numpy(
-                    processed_sample.trajectory[feature]
-                )
+            for j, feature in enumerate(self.features):
+                if self.feature_type == "timeseries":
+                    features[i, j, :] = torch.from_numpy(
+                        processed_sample.trajectory[feature]
+                    )
+                else:
+                    features[i, j] = processed_sample.scalars[feature]
             for j, target in enumerate(self.targets):
                 targets[i, j] = processed_sample.targets[target]
         logger.info("Done!")
 
-        return ts_features, targets
+        return features, targets

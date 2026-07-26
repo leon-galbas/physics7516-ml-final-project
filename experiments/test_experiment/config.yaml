@@ -6,6 +6,7 @@ simulation:
 
 data:
   n_timepoints: 500
+  feature_type: timeseries
   transforms:
     - TimeSlice:
         t_min: 0
@@ -15,12 +16,11 @@ data:
         distribution: "even"
     - GaussianNoise:
         std: 0.1
-  ts_features:
+  features:
     - t
     - x
     - y
     - z
-  # scalar_features: []
   targets:
     - v0
     - theta
