@@ -1,3 +1,11 @@
+"""
+This file was initially generated with the assistance of OpenAI's ChatGPT
+and subsequently reviewed and modified by the project authors.
+
+Generation date: 2026-07-26
+Model: GPT-5.5
+"""
+
 import logging
 import math
 from pathlib import Path
@@ -10,7 +18,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
 logger = logging.getLogger(__name__)
@@ -481,7 +489,7 @@ def plot_per_target_metric(
         (metrics["split"] == split) & (metrics["target"] != "overall")
     ].copy()
 
-    target_metrics = target_metrics.sort_values("target_index").head(max_targets)
+    target_metrics = target_metrics.sort_values("target_index").head(max_targets)  # pyright: ignore[reportCallIssue]
 
     plt.figure(figsize=(max(8, 0.45 * len(target_metrics)), 6))
     plt.bar(target_metrics["target"], target_metrics[metric])
