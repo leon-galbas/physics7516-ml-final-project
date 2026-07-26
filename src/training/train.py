@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
@@ -174,6 +174,8 @@ def main(
     end_epoch = start_epoch + epochs
     early_stopping = get_nested(config, "training", "early_stopping", default=0)
     improve_counter = 0
+    cropping = get_nested(config, "training", "cropping")
+    test_cropping = get_nested(config, "training", "test_cropping", default=1.0)
     for epoch in range(start_epoch, end_epoch):
         logger.info(f"Start epoch {epoch + 1}/{end_epoch}...")
 
@@ -181,6 +183,11 @@ def main(
         model.train()
         running_loss = 0.0
         for X_batch, Y_batch in tqdm(train_loader):
+            if feature_type == "timeseries" and cropping is not None:
+                X_batch = random_crop_batch_timeseries(
+                    X_batch,
+                    **cropping,  # pyright: ignore[reportArgumentType]
+                )
             optimizer.zero_grad()
             prediction = model(X_batch)
             loss = criterion(prediction, Y_batch)
@@ -195,6 +202,8 @@ def main(
         running_loss = 0.0
         with torch.no_grad():
             for X_batch, Y_batch in tqdm(test_loader):
+                if feature_type == "timeseries" and test_cropping < 1.0:  # pyright: ignore[reportOperatorIssue]
+                    X_batch = crop_to_fraction(X_batch, test_cropping)  # pyright: ignore[reportArgumentType]
                 prediction = model(X_batch)
                 loss = criterion(prediction, Y_batch)
                 running_loss += loss.item()
@@ -258,6 +267,49 @@ def main(
         batch_size=batch_size,  # pyright: ignore[reportArgumentType]
         target_names=get_nested(config, "data", "targets"),  # pyright: ignore[reportArgumentType]
     )
+
+
+def random_crop_batch_timeseries(
+    X_batch: torch.Tensor,
+    min_frac: float = 0.2,
+    max_frac: float = 1.0,
+    min_points: int = 2,
+) -> torch.Tensor:
+    if X_batch.ndim != 3:
+        raise ValueError(
+            "Expected timeseries input of shape [batch_size, features, timepoints], "
+            f"got {X_batch.shape}."
+        )
+
+    _, _, T = X_batch.shape
+
+    min_len = max(min_points, int(min_frac * T))
+    max_len = max(min_len, int(max_frac * T))
+
+    k = torch.randint(
+        low=min_len,
+        high=max_len + 1,
+        size=(1,),
+    ).item()
+
+    return X_batch[:, :, :k]
+
+
+def crop_to_fraction(
+    X_batch: torch.Tensor,
+    frac: float,
+    min_points: int = 2,
+) -> torch.Tensor:
+    if X_batch.ndim != 3:
+        raise ValueError(
+            "Expected timeseries input of shape [batch_size, features, timepoints], "
+            f"got {X_batch.shape}."
+        )
+
+    _, _, T = X_batch.shape
+    k = max(min_points, int(frac * T))
+
+    return X_batch[:, :, :k]
 
 
 if __name__ == "__main__":
