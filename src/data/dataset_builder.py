@@ -81,7 +81,7 @@ class DatasetBuilder:
         logger.info("Processing raw samples...")
         iterator = enumerate(raw_samples)  # pyright: ignore[reportArgumentType]
         if verbose:
-            iterator = tqdm(iterator)
+            iterator = tqdm(iterator, total=len(raw_samples), desc="Processing")  # pyright: ignore[reportArgumentType]
         for i, sample in iterator:
             processed_sample = self.pipeline(sample)
             for j, feature in enumerate(self.ts_features):
@@ -89,7 +89,7 @@ class DatasetBuilder:
                     processed_sample.trajectory[feature]
                 )
             for j, target in enumerate(self.targets):
-                targets[i, j] = torch.from_numpy(processed_sample.targets[target])
+                targets[i, j] = processed_sample.targets[target]
         logger.info("Done!")
 
         return ts_features, targets

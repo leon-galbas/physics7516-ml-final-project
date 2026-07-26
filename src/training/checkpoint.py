@@ -60,7 +60,7 @@ def unpack_checkpoint(checkpoint: dict, config: dict):
         raise ValueError("No optimizer specified in the training configuration!")
     optim_params = get_nested(config, "optimizer", "params", default={})
     optim_class = OPTIMIZERS.get(optim_name)  # pyright: ignore[reportArgumentType]
-    optimizer = optim_class(**optim_params)  # pyright: ignore[reportOptionalCall]
+    optimizer = optim_class(model.parameters(), **optim_params)  # pyright: ignore[reportOptionalCall]
     optimizer_state_dict = checkpoint.get("optimizer_state")
     if optimizer_state_dict is not None:
         optimizer.load_state_dict(optimizer_state_dict)
@@ -72,7 +72,7 @@ def unpack_checkpoint(checkpoint: dict, config: dict):
     else:
         scheduler_params = get_nested(config, "scheduler", "params", default={})
         scheduler_class = SCHEDULERS.get(scheduler_name)  # pyright: ignore[reportArgumentType]
-        scheduler = scheduler_class(**scheduler_params)  # pyright: ignore[reportOptionalCall]
+        scheduler = scheduler_class(optimizer, **scheduler_params)  # pyright: ignore[reportOptionalCall]
         scheduler_state_dict = checkpoint.get("scheduler_state")
         if scheduler_state_dict is not None:
             scheduler.load_state_dict(scheduler_state_dict)

@@ -16,7 +16,6 @@ def get_nested(d, *keys, default=None):
     value = d
     for key in keys:
         if not isinstance(value, dict) or key not in value:
-            raise KeyError(f"Missing key: {' -> '.join(map(str, keys))}")
             return default
         value = value[key]
     return value

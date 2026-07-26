@@ -29,7 +29,6 @@ class GaussianNoise:
 
     def __call__(self, sample: ProcessedSample) -> ProcessedSample:
         n = len(sample.trajectory["t"])
-        print(n)
         noise = self.rng.normal(0.0, self.std, size=(n, 3))
         for i, key in enumerate(["x", "y", "z"]):
             sample.trajectory[key] += noise[:, i]

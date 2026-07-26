@@ -1,6 +1,6 @@
 simulation:
   repo_name: "10000p_default_ranges"
-  n_samples: 200000
+  n_samples: 2000
   n_timepoints: 10000
   seed: 42
 
@@ -31,9 +31,9 @@ data:
 model:
   name: "MLP"
   params:
-    input_dim: 4000
-    output_dim: 8
-    hidden_dim: [16000, 4000]
+    input_dim: 2000
+    output_dim: 3
+    hidden_dim: [8000, 2000]
     num_hidden_layers: 2
 
 loss:
@@ -43,16 +43,18 @@ loss:
 optimizer:
   name: "Adam"
   params:
-    lr: 1e-3
+    lr: 1.0e-3
 
 scheduler:
   name: "ReduceLROnPlateau"
   params:
     mode: "min"
     factor: 0.1
-    patience: 3
+    patience: 10
+    min_lr: 1.0e-6
 
 training:
   seed: 42
   training_size: 0.2
   batch_size: 256
+  early_stopping: 32

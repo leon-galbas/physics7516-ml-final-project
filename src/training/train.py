@@ -1,9 +1,10 @@
 import argparse
 import logging
 from datetime import datetime
-from os import path
+from os import makedirs, path
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
@@ -21,6 +22,7 @@ from src.training.checkpoint import (
     unpack_checkpoint,
 )
 from src.utils import get_nested, read_config
+from src.visualization.evaluation import main as evaluate
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +40,17 @@ def main(
     start_checkpoint: int | None = None,
 ) -> None:
     logger.info(f"Starting the experiment specified in '{config_file}'.")
+
+    # initialize directories
     directory = path.dirname(config_file)
+    data_dir = path.join(directory, "data")
+    checkpoint_dir = path.join(directory, "checkpoints")
+    eval_dir = path.join(directory, "evaluation")
+    makedirs(data_dir, exist_ok=True)
+    makedirs(checkpoint_dir, exist_ok=True)
+    makedirs(eval_dir, exist_ok=True)
+
+    # read config
     config = read_config(config_file)
 
     # generate trajectories
@@ -48,8 +60,8 @@ def main(
     generator.generate_to_repo(sim_config["repo_name"], n_samples, verbose=True)
 
     # load data
-    features_path = path.join(directory, "X.pt")
-    targets_path = path.join(directory, "Y.pt")
+    features_path = path.join(data_dir, "X.pt")
+    targets_path = path.join(data_dir, "Y.pt")
     if path.exists(features_path) and path.exists(targets_path):
         logger.info("The processed dataset already exists. Loading data...")
         X = torch.load(features_path)
@@ -85,19 +97,20 @@ def main(
     # create batches
     training_data = TensorDataset(X_train, Y_train)
     test_data = TensorDataset(X_test, Y_test)
+    batch_size = get_nested(config, "training", "batch_size", default=256)
     train_loader = DataLoader(
         training_data,
-        batch_size=get_nested(config, "training", "batch_size", default=256),  # pyright: ignore[reportArgumentType]
+        batch_size=batch_size,  # pyright: ignore[reportArgumentType]
         shuffle=True,
     )
     test_loader = DataLoader(
         test_data,
-        batch_size=get_nested(config, "training", "batch_size", default=256),  # pyright: ignore[reportArgumentType]
+        batch_size=batch_size,  # pyright: ignore[reportArgumentType]
         shuffle=False,
     )
 
     # load checkpoint
-    latest_checkpoint = get_latest_checkpoint_number(directory)
+    latest_checkpoint = get_latest_checkpoint_number(checkpoint_dir)
     if start_checkpoint is None:
         start_checkpoint = latest_checkpoint
     else:
@@ -106,11 +119,11 @@ def main(
                 "The 'start_checkpoint' is greater than the latest checkpoint "
                 f"({start_checkpoint} vs {latest_checkpoint})."
             )
-    delete_checkpoints_after(directory, start_checkpoint)
+    delete_checkpoints_after(checkpoint_dir, start_checkpoint)
 
     # instantiate stuff
     if start_checkpoint >= 0:
-        checkpoint = load_checkpoint(directory, index=start_checkpoint)
+        checkpoint = load_checkpoint(checkpoint_dir, index=start_checkpoint)
     else:
         checkpoint = {}
     model, optimizer, scheduler, loss_history, start_epoch, index = unpack_checkpoint(
@@ -130,6 +143,8 @@ def main(
         f"Starting training with loss function '{loss_name}' and optimizer '{optimizer}'..."
     )
     end_epoch = start_epoch + epochs
+    early_stopping = get_nested(config, "training", "early_stopping", default=0)
+    improve_counter = 0
     for epoch in range(start_epoch, end_epoch):
         logger.info(f"Start epoch {epoch + 1}/{end_epoch}...")
 
@@ -157,16 +172,63 @@ def main(
         test_loss = running_loss / len(test_loader)
         loss_history["test_loss"].append(test_loss)
 
+        # run scheduler
+        if scheduler is not None:
+            if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                scheduler.step(test_loss)
+            else:
+                scheduler.step()
+        lr = optimizer.param_groups[0]["lr"]
+
         logger.info(
-            f"Epoch {epoch + 1}/{end_epoch}, Train Loss: {train_loss:.6f}, Test Loss: {test_loss:.6f}"
+            f"Epoch {epoch + 1}/{end_epoch}, Train Loss: {train_loss:.6f}, "
+            f"Test Loss: {test_loss:.6f}, Learning Rate: {lr:.2e}"
         )
 
+        # save checkpoints
+        improve_counter += 1
         if epoch % check_freq == 0:
             index += 1
             checkpoint = create_checkpoint(
                 model, optimizer, scheduler, loss_history, epoch, index
             )
-            save_checkpoint(checkpoint, directory)
+            save_checkpoint(checkpoint, checkpoint_dir)
+
+        if test_loss <= np.min(np.array(loss_history["test_loss"])):
+            logger.info("New best test loss. Saving checkpoint...")
+            improve_counter = 0
+            checkpoint = create_checkpoint(
+                model, optimizer, scheduler, loss_history, epoch, index
+            )
+            save_checkpoint(checkpoint, checkpoint_dir, name="checkpoint_best")
+
+        # early stopping
+        if early_stopping != 0 and improve_counter > early_stopping:  # pyright: ignore[reportOperatorIssue]
+            break
+
+    # save final checkpoint
+    logger.info("Saving final checkpoint...")
+    checkpoint = create_checkpoint(
+        model, optimizer, scheduler, loss_history, epoch, index
+    )
+    save_checkpoint(checkpoint, checkpoint_dir, name="checkpoint_final")
+
+    # evaluate final model
+    logger.info("Evaluating best model...")
+    checkpoint = load_checkpoint(checkpoint_dir, name="checkpoint_best")
+    model, optimizer, scheduler, loss_history, start_epoch, index = unpack_checkpoint(
+        checkpoint, config
+    )
+    evaluate(
+        model,
+        X_train,
+        Y_train,
+        X_test,
+        Y_test,
+        output_dir=eval_dir,
+        batch_size=batch_size,  # pyright: ignore[reportArgumentType]
+        target_names=get_nested(config, "data", "targets"),  # pyright: ignore[reportArgumentType]
+    )
 
 
 if __name__ == "__main__":
