@@ -1,4 +1,4 @@
-import torch.nn as nn
+from torch import nn
 
 
 class MLP(nn.Module):
@@ -19,7 +19,7 @@ class MLP(nn.Module):
                     f"The length of 'hidden_dim' ({len(hidden_dim)}) must match 'num_hidden_layers' ({num_hidden_layers}). "
                 )
         else:
-            raise ValueError(
+            raise TypeError(
                 f"The 'hidden_dim' must be of type 'int' or 'list[int]'. Found '{type(hidden_dim)}'."
             )
 

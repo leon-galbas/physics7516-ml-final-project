@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 MODELS = {
     "MLP": mods.MLP,
+    "GRU": mods.GRU,
 }
 
 OPTIMIZERS = {
