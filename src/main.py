@@ -10,26 +10,29 @@ logger = logging.getLogger(__name__)
 
 
 configs = [
-    "experiments/01_MLP_velocity/config.yaml",
+    # "experiments/01_MLP_velocity/config.yaml",
     # "experiments/02_MLP_all-params/config.yaml",
     "experiments/03_GRU_all-params/config.yaml",
     "experiments/04_GRU_with-acceleration/config.yaml",
     "experiments/05_GRU_with-cropping/config.yaml",
+    "experiments/06_GRU_with-cropping_bigger/config.yaml",
 ]
 epochs = [
-    1000,
     # 1000,
+    # 1000,
+    100,
     100,
     100,
     100,
 ]
 
 checkpoint_intervals = [
-    50,
     # 50,
-    5,
-    5,
-    5,
+    # 50,
+    10,
+    10,
+    10,
+    10,
 ]
 
 

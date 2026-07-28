@@ -1,40 +1,52 @@
 simulation:
   repo_name: "10000p_default_ranges"
-  n_samples: 2000
+  n_samples: 200000
   n_timepoints: 10000
   seed: 42
 
 data:
-  n_timepoints: 500
+  n_timepoints: 100
   feature_type: timeseries
   transforms:
-    - TimeSlice:
-        t_min: 0
-        t_max: 10
     - Resample:
-        n_timepoints: 500
+        n_timepoints: 100
         distribution: "even"
-    - GaussianNoise:
-        std: 0.1
+    - ComputeVelocities
+    - ComputeAccelerations
+    - ComputeEuclideanVelocity
   features:
     - t
     - x
     - y
     - z
+    - vx
+    - vy
+    - vz
+    - ax
+    - ay
+    - az
   targets:
-    - v0
-    - theta
-    - phi
-
-
+    - vx
+    - vy
+    - vz
+    - ux
+    - uy
+    - uz
+    - omega_x
+    - omega_y
+    - omega_z
+    - beta_D
+    - beta_M
+  feature_scaling: True
+  target_scaling: True
 
 model:
-  name: "MLP"
+  name: "GRU"
   params:
-    input_dim: 2000
-    output_dim: 3
-    hidden_dim: [8000, 2000]
-    num_hidden_layers: 2
+    input_dim: 4
+    output_dim: 11
+    hidden_dim: 128
+    num_layers: 2
 
 loss:
   name: "MSE"

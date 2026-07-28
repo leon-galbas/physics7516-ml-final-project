@@ -1,0 +1,82 @@
+simulation:
+  repo_name: "10000p_default_ranges"
+  n_samples: 200000
+  n_timepoints: 10000
+  seed: 42
+
+data:
+  n_timepoints: 100
+  feature_type: timeseries
+  transforms:
+    - ComputeHitpoint
+    - Resample:
+        n_timepoints: 100
+        distribution: "even"
+    - ComputeVelocities
+    - ComputeAccelerations
+    - ComputeEuclideanVelocity
+  features:
+    - t
+    - x
+    - y
+    - z
+    - vx
+    - vy
+    - vz
+    - ax
+    - ay
+    - az
+  targets:
+    - vx
+    - vy
+    - vz
+    - ux
+    - uy
+    - uz
+    - omega_x
+    - omega_y
+    - omega_z
+    - beta_D
+    - beta_M
+    - hit_x
+    - hit_y
+  feature_scaling: true
+  target_scaling: true
+
+model:
+  name: "GRU"
+  params:
+    input_dim: 10
+    output_dim: 11
+    hidden_dim: 128
+    num_layers: 2
+    predict_endpoint: true
+    endpoint_dim: 2
+
+loss:
+  name: "MSE"
+  params: {}
+  lambda_endpoint: 0.5
+
+optimizer:
+  name: "Adam"
+  params:
+    lr: 1.0e-3
+
+scheduler:
+  name: "ReduceLROnPlateau"
+  params:
+    mode: "min"
+    factor: 0.1
+    patience: 10
+    min_lr: 1.0e-6
+
+training:
+  seed: 42
+  training_size: 0.2
+  batch_size: 256
+  early_stopping: 32
+  cropping:
+    min_frac: 0.2
+    max_frac: 1.0
+  test_cropping: 0.5

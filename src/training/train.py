@@ -176,6 +176,11 @@ def main(
     improve_counter = 0
     cropping = get_nested(config, "training", "cropping")
     test_cropping = get_nested(config, "training", "test_cropping", default=1.0)
+    predict_endpoint = get_nested(
+        config, "model", "params", "predict_endpoint", default=False
+    )
+    endpoint_dim = get_nested(config, "model", "params", "endpoint_dim", default=2)
+    lambda_endpoint = get_nested(config, "loss", "lambda_endpoint", default=1.0)
     for epoch in range(start_epoch, end_epoch):
         logger.info(f"Start epoch {epoch + 1}/{end_epoch}...")
 
@@ -189,8 +194,15 @@ def main(
                     **cropping,  # pyright: ignore[reportArgumentType]
                 )
             optimizer.zero_grad()
-            prediction = model(X_batch)
-            loss = criterion(prediction, Y_batch)
+            if predict_endpoint:
+                prediction, endpoint = model(X_batch)
+                loss = (
+                    criterion(prediction, Y_batch[:, :-endpoint_dim])  # pyright: ignore[reportOperatorIssue]
+                    + lambda_endpoint * criterion(endpoint, Y_batch[:, -endpoint_dim:])  # pyright: ignore[reportOperatorIssue]
+                )
+            else:
+                prediction = model(X_batch)
+                loss = criterion(prediction, Y_batch)
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
@@ -204,8 +216,16 @@ def main(
             for X_batch, Y_batch in tqdm(test_loader):
                 if feature_type == "timeseries" and test_cropping < 1.0:  # pyright: ignore[reportOperatorIssue]
                     X_batch = crop_to_fraction(X_batch, test_cropping)  # pyright: ignore[reportArgumentType]
-                prediction = model(X_batch)
-                loss = criterion(prediction, Y_batch)
+                if predict_endpoint:
+                    prediction, endpoint = model(X_batch)
+                    loss = (
+                        criterion(prediction, Y_batch[:, :-endpoint_dim])  # pyright: ignore[reportOperatorIssue]
+                        + lambda_endpoint
+                        * criterion(endpoint, Y_batch[:, -endpoint_dim:])  # pyright: ignore[reportOperatorIssue]
+                    )
+                else:
+                    prediction = model(X_batch)
+                    loss = criterion(prediction, Y_batch)
                 running_loss += loss.item()
         test_loss = running_loss / len(test_loader)
         loss_history["test_loss"].append(test_loss)

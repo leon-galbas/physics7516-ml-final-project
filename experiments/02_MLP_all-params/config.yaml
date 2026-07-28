@@ -1,0 +1,84 @@
+simulation:
+  repo_name: "10000p_default_ranges"
+  n_samples: 200000
+  n_timepoints: 10000
+  seed: 42
+
+data:
+  # n_timepoints: 500
+  feature_type: scalar
+  transforms:
+    - ComputeScalarFeatures
+    - ComputeEuclideanVelocity
+  features:
+    - x0
+    - y0
+    - z0
+    - xT
+    - yT
+    - zT
+    - T
+    - Dx
+    - Dy
+    - Dz
+    - distance
+    - length
+    - x_peak
+    - y_peak
+    - z_peak
+    - t_peak
+    - vx_init
+    - vy_init
+    - vz_init
+    - v_init
+    - vx_final
+    - vy_final
+    - vz_final
+    - v_final
+  targets:
+    - vx
+    - vy
+    - vz
+    - ux
+    - uy
+    - uz
+    - omega_x
+    - omega_y
+    - omega_z
+    - beta_D
+    - beta_M
+  feature_scaling: True
+  target_scaling: True
+
+
+
+model:
+  name: "MLP"
+  params:
+    input_dim: 24
+    output_dim: 11
+    hidden_dim: [128, 64, 32]
+    num_hidden_layers: 3
+
+loss:
+  name: "MSE"
+  params: {}
+
+optimizer:
+  name: "Adam"
+  params:
+    lr: 1.0e-3
+
+scheduler:
+  name: "ReduceLROnPlateau"
+  params:
+    mode: "min"
+    factor: 0.1
+    patience: 10
+    min_lr: 1.0e-6
+
+training:
+  seed: 42
+  training_size: 0.2
+  batch_size: 256
+  early_stopping: 32
