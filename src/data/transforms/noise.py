@@ -22,7 +22,7 @@ class GaussianNoise:
                 )
             self.std = np.array(std)
         else:
-            raise ValueError(
+            raise TypeError(
                 "The standard deviations must be a scalar or a list of length 3. "
                 f"Received '{std}'."
             )
@@ -55,7 +55,7 @@ class RandomWalkNoise:
                 )
             self.std = np.array(std)
         else:
-            raise ValueError(
+            raise TypeError(
                 "The standard deviations must be a scalar or a list of length 3. "
                 f"Received '{std}'."
             )

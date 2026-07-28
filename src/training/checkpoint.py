@@ -5,6 +5,7 @@ from pathlib import Path
 
 import torch
 import torch.optim as opt
+from torch import nn
 
 import src.models as mods
 from src.utils import get_nested
@@ -109,6 +110,25 @@ def load_checkpoint(
     checkpoint = torch.load(filename)
 
     return checkpoint
+
+
+def load_model_from_checkpoint(filename: str, config: dict) -> nn.Module:
+    # load checkpoint
+    logger.info(f"Loading model from checkpoint '{filename}'...")
+    checkpoint = torch.load(filename)
+
+    # load model
+    model_name = get_nested(config, "model", "name")
+    if model_name is None:
+        raise ValueError("No model specified in the configuration!")
+    model_params = get_nested(config, "model", "params", default={})
+    model_class = MODELS.get(model_name)  # pyright: ignore[reportArgumentType]
+    model = model_class(**model_params)  # pyright: ignore[reportOptionalCall]
+    model_state_dict = checkpoint.get("model_state")
+    if model_state_dict is not None:
+        model.load_state_dict(model_state_dict)
+
+    return model
 
 
 def get_latest_checkpoint_number(directory):
