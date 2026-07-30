@@ -1,0 +1,45 @@
+\section{Evaluation}
+\label{sec:evaluation}
+
+\subsection{Regression Metrics}
+
+Metrics are computed after undoing target standardization, separately for every physical output.
+For target $j$, with residual $e_{ij}=\hat{y}_{ij}-y_{ij}$ on $n$ test samples, the principal metrics are
+\begin{align}
+    \operatorname{RMSE}_j
+        &= \sqrt{\frac{1}{n}\sum_{i=1}^{n}e_{ij}^{\,2}}, \\
+    \operatorname{MAE}_j
+        &= \frac{1}{n}\sum_{i=1}^{n}\abs{e_{ij}}, \\
+    R_j^2
+        &= 1-\frac{\sum_i e_{ij}^{\,2}}
+        {\sum_i\left(y_{ij}-\bar{y}_j\right)^2}.
+\end{align}
+% TODO: Cite a standard reference for regression metrics and the interpretation of R^2.
+RMSE retains the unit of the corresponding target and penalizes large errors more strongly than MAE, while $R^2$ is dimensionless. Median and maximum absolute error, explained variance, mean bias, residual standard deviation, Pearson correlation, MAPE, and sMAPE are also recorded. Percentage errors are not used as primary evidence because several Cartesian and spin-direction components can be close to zero, for which relative errors become unstable.
+
+The supplied sweep plots flatten all output components before calculating an \enquote{overall RMSE}. Since the $11$ targets include velocities, dimensionless spin components, $\beta_D$ in $\si{\per\meter}$, and $\beta_M$ in $\si{\per\second}$, this aggregate is not a dimensionally meaningful physical error. Figures \ref{fig:cropping_performance} and \ref{fig:noise_performance} are therefore used only to visualize qualitative model trends. Quantitative comparisons are based on per-target metrics.
+
+\subsection{Robustness Protocol}
+
+The cropping sweep evaluates all six GRUs on deterministic trajectory prefixes
+\begin{equation*}
+    f\in\{0.1,0.2,\ldots,1.0\}.
+\end{equation*}
+For a sequence of length $T=100$, the model receives the first $\max(2,\lfloor fT\rfloor)$ samples. The sweep uses the same $40000$ test trajectories and targets at every fraction. It therefore isolates sensitivity to the amount of observed flight history.
+
+For the noise sweep, independent zero-mean Gaussian perturbations are added to every resampled position coordinate and time point,
+\begin{equation}
+    \tilde{\vb{r}}_k
+    =
+    \vb{r}_k+\vb{\epsilon}_k,
+    \qquad
+    \vb{\epsilon}_k\sim\mathcal{N}\!\left(\vb{0},\sigma^2 I_3\right),
+\end{equation}
+with
+\begin{equation*}
+    \sigma\in
+    \SIlist{0;0.01;0.02;0.05;0.10;0.20;0.50;1.00}{\meter}.
+\end{equation*}
+The noise is applied after resampling but before velocity and acceleration channels are computed and before saved clean-data standardization factors are applied. Thus, $\sigma$ is expressed in metres, and derivative-based models also receive derivatives of the noisy positions.
+% TODO: Cite a numerical-analysis reference on the amplification of measurement noise by differentiation.
+The physical trajectories themselves are not re-simulated: the preprocessing pipeline is rebuilt from the same raw repository, and the same split indices are reproduced.
