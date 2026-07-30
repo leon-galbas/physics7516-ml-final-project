@@ -7,12 +7,29 @@ The training and test loss curves decrease for all eight configurations, as illu
 The selected checkpoint occurs at epoch $953$ for the velocity-only MLP and at epoch $947$ for the all-parameter MLP. For the GRUs, the selected epochs are $413$, $159$, $343$, $251$, $399$, and $390$ for configurations 03--08, respectively.
 Because the objectives contain different numbers and types of standardized outputs, especially for the endpoint models in Eq. \eqref{eq:endpoint_loss}, absolute loss values should not be compared directly across every configuration.
 
-\begin{figure}[htbp]
-    \centering
-    % \includegraphics[width=\textwidth]{figures/loss_curves_overview.pdf}
-    \fbox{\rule{0pt}{0.22\linewidth}\rule{0.92\linewidth}{0pt}}
-    \caption{Training and test loss as a function of epoch. The log--log representation makes both the rapid initial decrease and later convergence visible.}
-    \label{fig:loss_curves}
+% \begin{figure}[htbp]
+%     \centering
+%     % \includegraphics[width=\linewidth]{figures/loss_curves_overview.pdf}
+%     \fbox{\rule{0pt}{0.22\linewidth}\rule{0.92\linewidth}{0pt}}
+%     \caption{Training and test loss as a function of epoch. The log--log representation makes both the rapid initial decrease and later convergence visible.}
+%     \label{fig:loss_curves}
+% \end{figure}
+
+\begin{figure}[t]
+  \centering
+
+  \subfloat[\label{fig:loss_curve_02}]{
+    \includegraphics[width=\linewidth]{../figures/02_MLP_all-params_loss_curve_loglog}
+  }
+
+  \vspace{0.5em}
+
+  \subfloat[\label{fig:loss_curve_05}]{
+    \includegraphics[width=\linewidth]{../figures/05_GRU_with-cropping_loss_curve_loglog}
+  }
+
+  \caption{Training and test loss as a function of epoch. The log-log representation makes both the rapid initial decrease and later convergence visible. Further loss curves can be found in the appendix (see Sec. \ref{sec:appendix}).}
+  \label{fig:loss_curves}
 \end{figure}
 
 \subsection{Performance on Complete, Noise-Free Trajectories}
@@ -64,8 +81,7 @@ These values are close to the corresponding full-trajectory errors in Table \ref
 
 \begin{figure}[htbp]
     \centering
-    % \includegraphics[width=0.92\textwidth]{figures/gru_performance_vs_cropping.pdf}
-    \fbox{\rule{0pt}{0.24\linewidth}\rule{0.92\linewidth}{0pt}}
+    \includegraphics[width=0.92\linewidth]{../figures/gru_performance_vs_cropping.pdf}
     \caption{Diagnostic aggregate RMSE of the GRU configurations as a function of the observed trajectory fraction. Since the aggregate mixes outputs with different physical units, per-target values are used for quantitative interpretation.}
     \label{fig:cropping_performance}
 \end{figure}
@@ -74,13 +90,11 @@ These values are close to the corresponding full-trajectory errors in Table \ref
 
 All GRUs are sensitive to measurement noise, and the degradation is already pronounced at $\sigma=\SI{0.01}{\meter}$, as shown in Figure \ref{fig:noise_performance}. For the derivative GRU without crop augmentation, the RMSE of $v_x$ increases from $\SI{1.03}{\meter\per\second}$ to $\SI{21.0}{\meter\per\second}$, while the RMSE of $u_x$ increases from $\SI{1.36}{\meter\per\second}$ to $\SI{9.50}{\meter\per\second}$. Over the same change, the $\beta_D$ error increases from $\SI{0.00127}{\per\meter}$ to $\SI{0.0120}{\per\meter}$. This behaviour is consistent with the fact that velocity and especially acceleration are obtained by differentiating already perturbed positions.
 
-No single configuration dominates for every noisy target. At $\sigma=\SI{0.01}{\meter}$, the position-only endpoint model has a lower $v_x$ RMSE of $\SI{6.94}{\meter\per\second}$, but its $u_x$ RMSE is $\SI{20.3}{\meter\per\second}$, compared with $\SI{9.50}{\meter\per\second}$ for the derivative GRU. The results therefore reveal a trade-off between clean-data accuracy and target-dependent robustness. They also show that crop augmentation alone is not a substitute for noise augmentation: none of the training configurations adds Gaussian observation noise. A natural extension is to train with noise levels representative of the intended measurement system, or to estimate derivatives using a smoothing or regularized procedure.
-% TODO: Cite literature on noise augmentation and/or smoothing numerical derivatives.
+No single configuration dominates for every noisy target. At $\sigma=\SI{0.01}{\meter}$, the position-only endpoint model has a lower $v_x$ RMSE of $\SI{6.94}{\meter\per\second}$, but its $u_x$ RMSE is $\SI{20.3}{\meter\per\second}$, compared with $\SI{9.50}{\meter\per\second}$ for the derivative GRU. The results therefore reveal a trade-off between clean-data accuracy and target-dependent robustness. They also show that crop augmentation alone is not a substitute for noise augmentation: none of the training configurations adds Gaussian observation noise. A natural extension is to train with noise levels representative of the intended measurement system \cite{bishop1995training}, or to estimate derivatives using a smoothing or regularized procedure \cite{chartrand2011numerical}.
 
 \begin{figure}[htbp]
     \centering
-    % \includegraphics[width=0.92\textwidth]{figures/gru_performance_vs_gaussian_noise.pdf}
-    \fbox{\rule{0pt}{0.24\linewidth}\rule{0.92\linewidth}{0pt}}
+    \includegraphics[width=0.92\linewidth]{../figures/gru_performance_vs_gaussian_noise.pdf}
     \caption{Diagnostic aggregate RMSE of the GRU configurations under independent Gaussian position noise. Noise is added before derivative features are computed. The aggregate curve is used qualitatively because it combines targets with different units.}
     \label{fig:noise_performance}
 \end{figure}

@@ -14,7 +14,7 @@ For an input feature vector $\vb{x}\in\mathbb{R}^{d_{\mathrm{in}}}$, the model c
     \vb{h}_{\ell+1} &= \sigma\left(W_{\ell+1}\vb{h}_{\ell}+\vb{b}_{\ell+1}\right), \qquad \ell = 1,\dots,L-1, \\
     \hat{\vb{y}} &= W_{\mathrm{out}}\vb{h}_{L} + \vb{b}_{\mathrm{out}},
 \end{align*}
-where $\sigma$ denotes the ReLU activation function and $\hat{\vb{y}}$ is the predicted target vector. % TODO: cite pytorch docs
+where $\sigma$ denotes the ReLU\cite{nair2010rectified} activation function and $\hat{\vb{y}}$ is the predicted target vector.
 The MLP experiments use scalar inputs with $24$ engineered features, and the output dimension is either $3$ for predicting the Cartesian initial velocity or $11$ for predicting the full set of selected launch and environmental parameters.
 
 The scalar features are designed to summarize the most important geometric and kinematic properties of the trajectory.
@@ -52,15 +52,15 @@ For an input $\vb{x}_t$ and previous hidden state $\vb{h}_{t-1}$, the standard G
     \vb{r}_t &= \sigma\left(W_r \vb{x}_t + U_r \vb{h}_{t-1} + \vb{b}_r\right), \\
     \tilde{\vb{h}}_t &= \tanh\left(W_h \vb{x}_t + U_h(\vb{r}_t \odot \vb{h}_{t-1}) + \vb{b}_h\right), \\
     \vb{h}_t &= (1-\vb{z}_t)\odot \vb{h}_{t-1} + \vb{z}_t \odot \tilde{\vb{h}}_t.
-\end{align*} % TODO: cite pytorch docs
-Here, $\vb{z}_t$ is the update gate, $\vb{r}_t$ is the reset gate, $\tilde{\vb{h}}_t$ is the candidate hidden state, and $\odot$ denotes element-wise multiplication.
+\end{align*}
+Here, $\vb{z}_t$ is the update gate, $\vb{r}_t$ is the reset gate, $\tilde{\vb{h}}_t$ is the candidate hidden state, and $\odot$ denotes element-wise multiplication.\cite{cho2014gru}
 The update gate allows the network to preserve information over many time steps, while the reset gate controls how strongly the previous hidden state contributes to the candidate state.
 This makes GRUs suitable for time-series analysis because they learn a compressed representation of the trajectory history rather than treating each time point independently.
 In this project, the final hidden state $\vb{h}_T$ is interpreted as a learned summary of the observed flight path and is used to predict the physical parameters.
 
 The GRU models are particularly appropriate for this problem because projectile trajectories contain temporally ordered information.
 Quantities such as curvature, deceleration, and asymmetry are not fully described by individual positions alone, but by their evolution over time.
-A recurrent architecture can use early and late parts of the trajectory jointly, and it can also be evaluated on cropped sequences, where only a prefix of the trajectory is available. % TODO: cite
+A recurrent architecture can use early and late parts of the trajectory jointly, and it can also be evaluated on cropped sequences, where only a prefix of the trajectory is available.\cite{cho2014gru}
 The training code supports random cropping of time-series batches by selecting only the first $k$ time points, where $k$ is sampled between fractions of the full sequence length.
 This allows the model to learn from partial trajectories and is useful for studying how much of the flight path is needed to infer the underlying launch and environmental parameters.
 
@@ -81,7 +81,7 @@ The target tensor has shape $(N,n_{\mathrm{targets}})$ in both cases.
 
 A central preprocessing step for the GRU models is resampling.
 Although the raw trajectories were generated with many time points, the GRU experiments use a reduced fixed-length representation with $100$ time points.
-The resampling transform first chooses new time points between the minimum and maximum time of the trajectory and then interpolates the trajectory channels using a cubic spline. % TODO: cite cubic spline
+The resampling transform first chooses new time points between the minimum and maximum time of the trajectory and then interpolates the trajectory channels using a cubic spline.\cite{de1978practical}
 The implemented sampling distributions include even, logarithmic, uniform, and Gaussian sampling over the normalized time interval.
 In the main GRU training configurations, even resampling is used, so the trajectory is represented by uniformly spaced time samples.
 This reduces computational cost while preserving a standardized input length for mini-batch training.
@@ -95,9 +95,9 @@ using numerical gradients of the position channels with respect to time.
 Acceleration channels are then computed analogously from the velocity channels.
 Some GRU configurations therefore use only $(t,x,y,z)$, while others use the extended feature set $(t,x,y,z,v_x,v_y,v_z,a_x,a_y,a_z)$.
 The motivation for adding velocities and accelerations is that the forces in the physical simulation act through velocity-dependent drag and Magnus terms, so derivative information may make the underlying parameters easier to identify.
-At the same time, numerical differentiation can amplify noise, so the benefit of these features must be evaluated empirically. % TODO: cite noise amplification
+At the same time, numerical differentiation can amplify noise, so the benefit of these features must be evaluated empirically. \cite{chartrand2011numerical}
 
-All models use standardization of features and targets. Standardization transforms each feature to have zero mean and unit variance, ensuring that all input features are on a comparable scale. This improves the stability and efficiency of gradient-based optimization, allowing neural networks to converge faster and preventing features with larger numerical values from disproportionately influencing the learning process. % TODO: cite scaling
+All models use standardization of features and targets. Standardization transforms each feature to have zero mean and unit variance, ensuring that all input features are on a comparable scale. This improves the stability and efficiency of gradient-based optimization, allowing neural networks to converge faster and preventing features with larger numerical values from disproportionately influencing the learning process.\cite{lecun2012efficient}
 For scalar inputs, feature means and standard deviations are computed over the training samples, while for time-series inputs they are computed over both the sample and time dimensions for each feature channel.
 Targets are standardized using the training-set mean and standard deviation for each output dimension.
 The standardized quantities are therefore

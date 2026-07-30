@@ -17,10 +17,10 @@ Configurations denoted by \enquote{derivatives} receive the ten channels
 \end{equation*}
 whereas the remaining GRUs receive only $(t,x,y,z)$.
 
-\begin{table}[htbp]
+\begin{table*}[htbp]
     \centering
     \small
-    \resizebox{\linewidth}{!}{%
+    \resizebox{\textwidth}{!}{%
     \begin{tabular}{llllll}
         \hline
         ID & Model & Input & Architecture & Output & Crop augmentation \\
@@ -37,7 +37,7 @@ whereas the remaining GRUs receive only $(t,x,y,z)$.
     \end{tabular}}
     \caption{Model configurations used in the experiments. The symbol $f$ denotes the observed fraction of a trajectory.}
     \label{tab:model_configurations}
-\end{table}
+\end{table*}
 
 During crop-augmented training, a single prefix length is sampled uniformly between $20$ and $100$ time points for each mini-batch, and the same length is used for every trajectory in that batch. For configurations 07 and 08, the test loss used during training is evaluated at $f=0.5$.
 Their two heads minimize
@@ -53,15 +53,13 @@ where both target blocks are standardized separately before the loss is computed
 
 \subsection{Optimization and Model Selection}
 
-All models are optimized with Adam using a batch size of $256$, an initial learning rate of $10^{-3}$, and mean squared error in standardized target space.
-% TODO: Cite the Adam optimizer.
-A \texttt{ReduceLROnPlateau} scheduler multiplies the learning rate by $0.1$ after $10$ epochs without improvement, down to a minimum of $10^{-6}$. Early stopping is configured with a tolerance of $32$ non-improving epochs. The checkpoint with the lowest test loss is retained and used in every subsequent evaluation.
-% TODO: Cite early stopping and learning-rate scheduling if these methods are discussed in the theoretical background.
+All models are optimized with Adam using a batch size of $256$, an initial learning rate of $10^{-3}$, and mean squared error in standardized target space.\cite{kingma2017adammethodstochasticoptimization}
+A \texttt{ReduceLROnPlateau} scheduler multiplies the learning rate by $0.1$ after $10$ epochs without improvement, down to a minimum of $10^{-6}$. Early stopping is configured with a tolerance of $32$ non-improving epochs. The checkpoint with the lowest test loss is retained and used in every subsequent evaluation.\cite{bottou2018optimization}
 
 The data permutation is reproducible because its seed is set explicitly. However, due to processing power constraints, only one trained instance of each configuration is available.The reported differences therefore describe these particular training runs. Uncertainty across initializations is not quantified.
 
-The whole machine learning framework is implemented using PyTorch. % TODO: Cite
-Additional numerical calculations are performed using the NumPy and SciPy libraries. % TODO: Cite
-Visualizations and plots are realized in Matplotlib. % TODO: Cite
+The whole machine learning framework is implemented using PyTorch.\cite{paszke2019pytorch}
+Additional numerical calculations are performed using the NumPy and SciPy libraries.\cite{harris2020array}\cite{virtanen2020scipy}
+Visualizations and plots are realized in Matplotlib.\cite{hunter2007matplotlib}
 
 The full source code for this project is available on GitHub under \url{https://github.com/leon-galbas/physics7516-ml-final-project}.

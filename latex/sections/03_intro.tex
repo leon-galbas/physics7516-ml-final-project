@@ -1,1 +1,9 @@
-\section{Introduction \label{sec:intro}}
+\section{Introduction}
+\label{sec:introduction}
+
+Inferring the causes of an observed trajectory is an inverse problem: instead of computing the motion from known initial and environmental conditions, one seeks to reconstruct those conditions from measured positions over time. For projectile motion, the task becomes non-trivial when drag, wind, and spin-induced Magnus forces act simultaneously, because several parameters can produce similar changes in range, curvature, or flight time. Reliable inference is additionally complicated when only an early part of the flight is visible or when measured positions contain noise.\cite{mehta1985aerodynamics}\cite{goff2009trajectory}
+% TODO: Cite literature on inverse problems and parameter identification in dynamical systems.
+
+This project studies the problem in a controlled synthetic setting in which the underlying physical parameters are known exactly. Trajectories are simulated in three dimensions, and two machine-learning representations are compared: manually engineered scalar descriptors processed by a multilayer perceptron (MLP), and complete or partial time series processed by gated recurrent unit (GRU) networks.\cite{cho2014gru} The models are used to infer the initial velocity together with wind, spin direction, and effective drag and Magnus parameters.
+
+The central questions are whether sequence models improve the joint recovery of physical parameters, how much performance changes when only a trajectory prefix is observed, and whether derivative features remain useful under measurement noise. Accordingly, the models are evaluated on complete trajectories, across different cropping fractions, and after adding Gaussian noise to the observed positions.

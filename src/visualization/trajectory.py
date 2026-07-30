@@ -1,5 +1,8 @@
 import matplotlib as mpl
 
+from src.data.repository import DataRepository
+from src.data.sample import RawSample
+
 mpl.use("Qt5Agg")
 import logging
 from os import path
@@ -13,17 +16,17 @@ logger = logging.getLogger(__name__)
 
 
 def plot_trajectory_3d(
-    trajectory: np.ndarray,
-    launch_parameters: np.ndarray | None = None,
+    sample: RawSample,
+    plot_launch_params: bool = False,
     outfile: str | None = None,
 ) -> None:
     fig = plt.figure()
     ax = fig.add_subplot(projection="3d")
 
     # plot trajectory
-    xs = trajectory[:, 1]
-    ys = trajectory[:, 2]
-    zs = trajectory[:, 3]
+    xs = sample.position[:, 0]
+    ys = sample.position[:, 1]
+    zs = sample.position[:, 2]
 
     ax.plot(xs, ys, zs, linestyle="-", color="blue", label="Trajectory")
     ax.plot(
@@ -58,12 +61,12 @@ def plot_trajectory_3d(
     ax.plot_surface(grid_x, grid_y, grid_z, alpha=0.5, color="grey", label="Ground")
 
     # plot launch parameters if given
-    if launch_parameters is not None:
-        v0, theta, phi, beta_D, beta_M, u_mag, u_theta, u_phi = launch_parameters
+    if plot_launch_params:
+        lp = sample.launch_params
         params = (
-            f"$(v_0,\\theta,\\phi) = ({v0:.2f},{theta:.2f},{phi:.2f})$\n"
-            f"$(u,u_\\theta,u_\\phi) = ({u_mag:.2f},{u_theta:.2f},{u_phi:.2f})$\n"
-            f"$\\beta_D = {beta_D:.2f}$, $\\beta_M = {beta_M:.2f}$"
+            f"$(v_0,\\theta,\\phi) = ({lp['v0']:.2f},{lp['theta']:.2f},{lp['phi']:.2f})$\n"
+            f"$(u_x,u_y,u_z) = ({lp['ux']:.2f},{lp['uy']:.2f},{lp['uz']:.2f})$\n"
+            f"$\\beta_D = {lp['beta_D']:.2f}$, $\\beta_M = {lp['beta_M']:.2f}$"
         )
         fig.text(
             0.02,
@@ -91,22 +94,12 @@ def plot_trajectory_3d(
         plt.close()
 
 
-def plot_trajectories_3d(
-    trajectories: np.ndarray | list[np.ndarray], outfile: str | None = None
-) -> None:
+def plot_trajectories_3d(samples: list[RawSample], outfile: str | None = None) -> None:
     # check values
-    if isinstance(trajectories, list):
-        trajectories = np.stack(trajectories)
-    if isinstance(trajectories, np.ndarray):
-        if trajectories.ndim != 3:
-            raise ValueError(
-                "Input must have shape (n_trajectories, n_points, 4).\n"
-                "For a single trajectory try 'plot_trajectory_3d'."
-            )
-        if trajectories.shape[2] != 4:
-            raise ValueError("Last dimension must contain t, x, y, z coordinates.")
+    if isinstance(samples, list):
+        trajectories = [s.position for s in samples]
     else:
-        raise TypeError("Input must either be a numpy array or a list of numpy arrays!")
+        raise TypeError("Input must be a list of 'RawSample'!")
 
     # initialize plot
     fig = plt.figure()
@@ -125,9 +118,9 @@ def plot_trajectories_3d(
         label="Launch point",
     )
     for i, trajectory in enumerate(trajectories):
-        xs = trajectory[:, 1]
-        ys = trajectory[:, 2]
-        zs = trajectory[:, 3]
+        xs = trajectory[:, 0]
+        ys = trajectory[:, 1]
+        zs = trajectory[:, 2]
 
         ax.plot(
             xs,
@@ -150,8 +143,10 @@ def plot_trajectories_3d(
         )
 
     # plot ground surface
-    xmin, xmax = (np.min(trajectories[:, :, 1]), np.max(trajectories[:, :, 1]))
-    ymin, ymax = (np.min(trajectories[:, :, 2]), np.max(trajectories[:, :, 2]))
+    xmin = min([np.min(traj[:, 0]) for traj in trajectories])
+    xmax = max([np.max(traj[:, 0]) for traj in trajectories])
+    ymin = min([np.min(traj[:, 1]) for traj in trajectories])
+    ymax = max([np.max(traj[:, 1]) for traj in trajectories])
     x_plane = np.array([xmin, xmax])
     y_plane = np.array([ymin, ymax])
     grid_x, grid_y = np.meshgrid(x_plane, y_plane)
@@ -174,3 +169,15 @@ def plot_trajectories_3d(
         plt.savefig(plot_path)
         logger.info(f"Plot saved to '{plot_path}'.")
         plt.close()
+
+
+def main() -> None:
+    repo_file = "data/raw/10000p_default_ranges.h5"
+    outfile = "sample_trajectories_3d.pdf"
+    with DataRepository(repo_file, "r") as repo:
+        samples = repo[:10]
+    plot_trajectories_3d(samples, outfile=outfile)
+
+
+if __name__ == "__main__":
+    main()
