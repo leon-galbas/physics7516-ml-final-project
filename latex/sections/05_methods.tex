@@ -1,0 +1,107 @@
+This section describes the machine learning methods used to infer physical launch and environmental parameters from simulated projectile trajectories.
+Two complementary model classes are considered: a multilayer perceptron (MLP) applied to manually engineered scalar trajectory descriptors, and gated recurrent unit (GRU) networks applied directly to time-resolved trajectory data.
+The overall motivation is to compare a compact feature-based representation against a sequence-based representation that can, in principle, learn relevant temporal structure directly from the observed motion.
+
+\subsection{Feature-Based Regression with a Multilayer Perceptron}
+
+As a non-recurrent baseline, we use a multilayer perceptron that maps a fixed-dimensional vector of scalar trajectory features to the desired physical target parameters.
+In the implementation, the MLP first flattens the input, then applies a sequence of fully connected linear layers with ReLU activations, followed by a final linear output layer.
+For an input feature vector $\vb{x}\in\mathbb{R}^{d_{\mathrm{in}}}$, the model can be written schematically as
+\begin{align*}
+    \vb{h}_1 &= \sigma\left(W_1 \vb{x} + \vb{b}_1\right), \\
+    \vb{h}_{\ell+1} &= \sigma\left(W_{\ell+1}\vb{h}_{\ell}+\vb{b}_{\ell+1}\right), \qquad \ell = 1,\dots,L-1, \\
+    \hat{\vb{y}} &= W_{\mathrm{out}}\vb{h}_{L} + \vb{b}_{\mathrm{out}},
+\end{align*}
+where $\sigma$ denotes the ReLU activation function and $\hat{\vb{y}}$ is the predicted target vector. % TODO: cite pytorch docs
+The MLP experiments use scalar inputs with $24$ engineered features, and the output dimension is either $3$ for predicting the Cartesian initial velocity or $11$ for predicting the full set of selected launch and environmental parameters.
+
+The scalar features are designed to summarize the most important geometric and kinematic properties of the trajectory.
+They include the initial and final positions $(x_0,y_0,z_0)$ and $(x_T,y_T,z_T)$, the total flight time $T$, the displacement components $(\Delta x,\Delta y,\Delta z)$, the Euclidean start-to-end distance, the total arc length of the trajectory, the apex position $(x_{\mathrm{peak}},y_{\mathrm{peak}},z_{\mathrm{peak}})$, the time of the apex $t_{\mathrm{peak}}$, and finite-difference estimates of the initial and final velocity components and speeds.
+These quantities provide physically interpretable information about range, curvature, maximum height, flight duration, and endpoint behavior.
+For example, the initial finite-difference velocity estimate is computed from the first two sampled trajectory points, while the final velocity estimate is computed from the last two sampled points.
+The total trajectory length is computed by summing the Euclidean distances between successive sampled positions.
+The apex is identified as the point of maximal height $z$, which gives both the peak position and the corresponding time.
+
+For some experiments, the desired target is not the spherical launch representation $(v_0,\theta,\phi)$, but the Cartesian initial velocity $(v_x,v_y,v_z)$.
+This target is computed using
+\begin{equation*}
+    \pmqty{v_x\\v_y\\v_z} = v_0\pmqty{\sin\theta\cos\phi\\\sin\theta\sin\phi\\\cos\theta}
+\end{equation*}
+which is implemented as a preprocessing target transformation.
+Using Cartesian velocity components avoids angular discontinuities in $\phi$ and gives a target representation that is often easier for regression models to learn.
+
+\subsection{Sequence-Based Regression with Gated Recurrent Units}
+
+The second model class is based on gated recurrent units, which are recurrent neural networks designed to process sequential data.
+Instead of receiving a single engineered feature vector, the GRU receives a time series of trajectory observations such as
+\begin{equation*}
+    \vb{x}_1,\vb{x}_2,\dots,\vb{x}_T, \qquad \vb{x}_t = \begin{pmatrix}
+        t_t & x_t & y_t & z_t
+    \end{pmatrix}^{\top},
+\end{equation*}
+or an extended version that also contains velocity and acceleration estimates.
+The GRU then returns a final hidden state, which is passed through a small feed-forward prediction head consisting of a linear layer, ReLU activation, dropout, and a final linear layer.
+In the endpoint-augmented variants, a second prediction head is added to predict the two-dimensional hit point separately from the physical parameter vector.
+
+A GRU updates its hidden state using gating mechanisms that control how much past information is retained and how much new information is incorporated.
+For an input $\vb{x}_t$ and previous hidden state $\vb{h}_{t-1}$, the standard GRU equations are
+\begin{align*}
+    \vb{z}_t &= \sigma\left(W_z \vb{x}_t + U_z \vb{h}_{t-1} + \vb{b}_z\right), \\
+    \vb{r}_t &= \sigma\left(W_r \vb{x}_t + U_r \vb{h}_{t-1} + \vb{b}_r\right), \\
+    \tilde{\vb{h}}_t &= \tanh\left(W_h \vb{x}_t + U_h(\vb{r}_t \odot \vb{h}_{t-1}) + \vb{b}_h\right), \\
+    \vb{h}_t &= (1-\vb{z}_t)\odot \vb{h}_{t-1} + \vb{z}_t \odot \tilde{\vb{h}}_t.
+\end{align*} % TODO: cite pytorch docs
+Here, $\vb{z}_t$ is the update gate, $\vb{r}_t$ is the reset gate, $\tilde{\vb{h}}_t$ is the candidate hidden state, and $\odot$ denotes element-wise multiplication.
+The update gate allows the network to preserve information over many time steps, while the reset gate controls how strongly the previous hidden state contributes to the candidate state.
+This makes GRUs suitable for time-series analysis because they learn a compressed representation of the trajectory history rather than treating each time point independently.
+In this project, the final hidden state $\vb{h}_T$ is interpreted as a learned summary of the observed flight path and is used to predict the physical parameters.
+
+The GRU models are particularly appropriate for this problem because projectile trajectories contain temporally ordered information.
+Quantities such as curvature, deceleration, and asymmetry are not fully described by individual positions alone, but by their evolution over time.
+A recurrent architecture can use early and late parts of the trajectory jointly, and it can also be evaluated on cropped sequences, where only a prefix of the trajectory is available. % TODO: cite
+The training code supports random cropping of time-series batches by selecting only the first $k$ time points, where $k$ is sampled between fractions of the full sequence length.
+This allows the model to learn from partial trajectories and is useful for studying how much of the flight path is needed to infer the underlying launch and environmental parameters.
+
+\subsection{Data Preprocessing and Representation}
+
+The raw simulator output consists of time arrays, three-dimensional positions, launch parameters, and metadata stored in immutable raw samples.
+During preprocessing, each raw sample is converted into a processed representation containing trajectory channels $t,x,y,z$, scalar features, targets, and optionally metadata.
+The dataset builder applies a configurable pipeline of transformations to each raw sample and then writes the selected features and targets into PyTorch tensors.
+For time-series data, the resulting feature tensor has shape
+\begin{equation*}
+    (N, n_{\mathrm{features}}, n_{\mathrm{timepoints}}),
+\end{equation*}
+whereas scalar-feature data are stored as
+\begin{equation*}
+    (N, n_{\mathrm{features}}).
+\end{equation*}
+The target tensor has shape $(N,n_{\mathrm{targets}})$ in both cases.
+
+A central preprocessing step for the GRU models is resampling.
+Although the raw trajectories were generated with many time points, the GRU experiments use a reduced fixed-length representation with $100$ time points.
+The resampling transform first chooses new time points between the minimum and maximum time of the trajectory and then interpolates the trajectory channels using a cubic spline. % TODO: cite cubic spline
+The implemented sampling distributions include even, logarithmic, uniform, and Gaussian sampling over the normalized time interval.
+In the main GRU training configurations, even resampling is used, so the trajectory is represented by uniformly spaced time samples.
+This reduces computational cost while preserving a standardized input length for mini-batch training.
+
+Additional time-series features are obtained by numerical differentiation.
+Velocity channels are computed as
+\begin{equation*}
+    v_i(t) \approx \dv{r_i}{t}, \qquad i\in\{x,y,z\},
+\end{equation*}
+using numerical gradients of the position channels with respect to time.
+Acceleration channels are then computed analogously from the velocity channels.
+Some GRU configurations therefore use only $(t,x,y,z)$, while others use the extended feature set $(t,x,y,z,v_x,v_y,v_z,a_x,a_y,a_z)$.
+The motivation for adding velocities and accelerations is that the forces in the physical simulation act through velocity-dependent drag and Magnus terms, so derivative information may make the underlying parameters easier to identify.
+At the same time, numerical differentiation can amplify noise, so the benefit of these features must be evaluated empirically. % TODO: cite noise amplification
+
+All models use standardization of features and targets. Standardization transforms each feature to have zero mean and unit variance, ensuring that all input features are on a comparable scale. This improves the stability and efficiency of gradient-based optimization, allowing neural networks to converge faster and preventing features with larger numerical values from disproportionately influencing the learning process. % TODO: cite scaling
+For scalar inputs, feature means and standard deviations are computed over the training samples, while for time-series inputs they are computed over both the sample and time dimensions for each feature channel.
+Targets are standardized using the training-set mean and standard deviation for each output dimension.
+The standardized quantities are therefore
+\begin{equation*}
+    \tilde{x} = \frac{x-\mu_x}{\sigma_x+\epsilon}, \qquad \tilde{y} = \frac{y-\mu_y}{\sigma_y+\epsilon},
+\end{equation*}
+with a small numerical constant $\epsilon=10^{-8}$ used for stability.
+The same scaling factors are then applied to the corresponding test data, which avoids information leakage from the test set into the training process.
+For later standalone evaluation runs, the saved feature and target scaling factors can be loaded and reused.
