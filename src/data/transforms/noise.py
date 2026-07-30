@@ -5,22 +5,25 @@ from src.data.sample import ProcessedSample
 
 class GaussianNoise:
     def __init__(
-        self, std: float | list[float], rng: np.random.Generator | None = None
+        self,
+        std: float | list[float],
+        rng: np.random.Generator | None = None,
+        seed: int | None = None,
     ) -> None:
         if rng is not None:
             self.rng = rng
         else:
-            self.rng = np.random.default_rng()
+            self.rng = np.random.default_rng(seed)
 
-        if isinstance(std, float):
-            self.std = np.array([std, std, std])
+        if isinstance(std, float) or isinstance(std, int):
+            self.std = np.array([float(std), float(std), float(std)])
         elif isinstance(std, list):
             if len(std) != 3:
                 raise ValueError(
                     "The standard deviations must be a scalar or a list of length 3. "
                     f"Received list of length {len(std)}."
                 )
-            self.std = np.array(std)
+            self.std = np.array(std, dtype=float)
         else:
             raise TypeError(
                 "The standard deviations must be a scalar or a list of length 3. "
@@ -38,22 +41,25 @@ class GaussianNoise:
 
 class RandomWalkNoise:
     def __init__(
-        self, std: float | list[float], rng: np.random.Generator | None = None
+        self,
+        std: float | list[float],
+        rng: np.random.Generator | None = None,
+        seed: int | None = None,
     ) -> None:
         if rng is not None:
             self.rng = rng
         else:
-            self.rng = np.random.default_rng()
+            self.rng = np.random.default_rng(seed)
 
-        if isinstance(std, float):
-            self.std = np.array([std, std, std])
+        if isinstance(std, float) or isinstance(std, int):
+            self.std = np.array([float(std), float(std), float(std)])
         elif isinstance(std, list):
             if len(std) != 3:
                 raise ValueError(
                     "The standard deviations must be a scalar or a list of length 3. "
                     f"Received list of length {len(std)}."
                 )
-            self.std = np.array(std)
+            self.std = np.array(std, dtype=float)
         else:
             raise TypeError(
                 "The standard deviations must be a scalar or a list of length 3. "
