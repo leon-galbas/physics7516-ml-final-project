@@ -1,0 +1,50 @@
+output_dir: "experiments/evaluation/all"
+batch_size: 256
+
+make_loss_plots: true
+evaluate_train_test: true
+
+experiments:
+  - "experiments/training/01_MLP_velocity"
+  - "experiments/training/02_MLP_all-params"
+  - "experiments/training/03_GRU_all-params"
+  - "experiments/training/04_GRU_with-acceleration"
+  - "experiments/training/05_GRU_with-cropping"
+  - "experiments/training/06_GRU_with-cropping_bigger"
+  - "experiments/training/07_GRU_with-cropping_endpoint"
+  - "experiments/training/08_GRU_with-cropping_bigger_endpoint"
+
+cropping_sweep:
+  enabled: true
+  metric: "rmse"
+  fractions:
+    - 0.10
+    - 0.20
+    - 0.30
+    - 0.40
+    - 0.50
+    - 0.60
+    - 0.70
+    - 0.80
+    - 0.90
+    - 1.00
+
+gaussian_noise_sweep:
+  enabled: true
+  metric: "rmse"
+  seed: 123
+
+  # Standard deviation of Gaussian position noise in meters.
+  std_levels:
+    - 0.0
+    - 0.01
+    - 0.02
+    - 0.05
+    - 0.10
+    - 0.20
+    - 0.50
+    - 1.00
+
+  # Set to null for the full 200000 samples.
+  # For quick debugging, use e.g. 5000.
+  max_samples: null
