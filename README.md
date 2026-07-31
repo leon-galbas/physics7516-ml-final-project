@@ -22,35 +22,20 @@ uv sync
 
 ## Usage
 
-### Generating data
-
 Individual python scripts can be run via
 
 ```bash
 uv run src/<script>.py <args>
 ```
 
-In order to generate a dataset of trajectories you can execute the script
-`src/data/make_dataset.py` with a given dataset name. For testing, try
+### Generating Data
 
-```bash
-uv run src/data/make_dataset.py example
-```
+TBD
 
-This will generate an example dataset of 1000 trajectories consisting of 100
-timepoints each, as specified in `config/dataset/example.yaml`. It is also
-possible to generate data with gaussian or random-walk noise. Example
-configurations for that can be found in `example_gauss-noise.yaml` and
-`example_random-walk-noise.yaml` and can be run via
+### Training Models
 
-```bash
-uv run src/data/make_dataset.py example_gauss-noise
-uv run src/data/make_dataset.py example_random-walk-noise
-```
+TBD
 
-### Plotting trajectories
+### Evaluating Models
 
-Helper functions for plotting trajectories can be found in
-`src/visualization/trajectory.py`.
-
-Further Information will follow as the project progresses.
+TBD
