@@ -34,20 +34,6 @@
 \definecolor{muted}{RGB}{105,105,105}
 \definecolor{rulegray}{RGB}{205,210,218}
 
-% A compile-safe placeholder for figures that will be inserted later.
-% Usage: \figureplaceholder[height]{description}
-\newcommand{\figureplaceholder}[2][0.43\textheight]{%
-  \centering
-  \fbox{%
-    \begin{minipage}[c][#1][c]{0.92\linewidth}
-      \centering
-      \color{codegray}
-      \Large Figure placeholder\\[0.5em]
-      \normalsize #2
-    \end{minipage}%
-  }%
-}
-
 % Title page
 \title[Trajectory Prediction]{Inferring Launch and Environmental Parameters from Simulated Trajectories}
 \subtitle{Machine Learning for Quantum Scientists (physics7516)}
@@ -72,13 +58,6 @@
     \tableofcontents[currentsection]
 \end{frame}
 }
-% Speaker notes (0:00--0:20):
-% - Introduce the project as an inverse problem.
-% - The forward task is to simulate a trajectory from physical parameters.
-% - The question here is whether a neural network can reconstruct those hidden
-%   parameters from the observed flight path.
-% [Sources]
-% - Project abstract and introduction: 02_abstract.tex, 03_intro.tex.
 
 \section{Problem idea and data generation}
 
@@ -102,22 +81,6 @@
     \big)
   \]
 \end{frame}
-% Speaker notes (0:15--0:55):
-% - The input is a sequence of 3D positions.
-% - The 11 outputs describe launch velocity, wind, spin direction, drag,
-%   and Magnus strength.
-% - Wind and aerodynamic parameters are latent: they must be inferred from
-%   curvature and deceleration.
-% [Sources]
-% - Project target definition: 04_data.tex and 05_methods.tex.
-% Speaker notes (0:20--0:55):
-% - The input is a sequence of measured 3D positions.
-% - The output contains 11 quantities: initial velocity, wind, spin direction,
-%   and effective drag and Magnus coefficients.
-% - Emphasize that wind and aerodynamic parameters are not directly observed;
-%   they must be inferred from how the trajectory bends and slows down.
-% [Sources]
-% - Project target definition: 04_data.tex and 05_methods.tex.
 
 \begin{frame}{Simulated trajectories}
     \begin{figure}[h]
@@ -126,13 +89,6 @@
         \caption{Ten exemplary simulated trajectories.}
     \end{figure}
 \end{frame}
-% Speaker notes (0:55--1:30):
-% - Point out variation in range, height, curvature, and flight time.
-% - Each trajectory comes with the exact parameters used to generate it.
-% - This gives a controlled supervised-learning problem.
-% [Sources]
-% - Project simulation: 04_data.tex.
-% - Figure to insert: sample_trajectories_3d.pdf.
 
 \begin{frame}{Equations of motion}
   \vspace{0.25cm}
