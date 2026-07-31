@@ -1,3 +1,10 @@
+"""
+AI Assistance Declaration
+
+This script was generated with the assistance of ChatGPT 5.5 Full and was
+subsequently reviewed and slightly modified by hand.
+"""
+
 import argparse
 import copy
 import logging
